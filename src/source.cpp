@@ -569,6 +569,10 @@ static void init_all() {
 
 	SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
 
+	Gdiplus::GdiplusStartupInput gdipsi;
+	ULONG_PTR gdipt;
+	Gdiplus::GdiplusStartup(&gdipt, &gdipsi, NULL);
+
 	init_d3d11(hwnd, WW, WH);
 	init_logo_image();
 
@@ -1644,11 +1648,15 @@ static GUID get_GUID(Encoder_Format encoder_format) {
 	}
 }
 
-static HRESULT save_image(Encoder_Format encoder_format, wchar_t* path) {
+static HRESULT save_image(Encoder_Format encoder_format, wchar_t* path, bool clipboard = false) {
 	Graphics* ctx = &G->graphics;
 
-	HRESULT hr;
-	if (path == 0) {
+	IWICBitmapEncoder* encoder = 0;
+	IWICStream* stream = 0;
+	IWICBitmapFrameEncode* frame = 0;
+
+	HRESULT hr = 0;
+	if (!clipboard && path == 0) {
 		push_alert("Failed to fetch file path from `save as` dialogue.");
 		return -1;
 	}
@@ -1735,11 +1743,46 @@ static HRESULT save_image(Encoder_Format encoder_format, wchar_t* path) {
 		goto cleanup;
 	}
 
+	if (clipboard) {
+		// @hkva: GdiPlus required here as Gdi32 does not easily support bitmaps with alpha channels.
+		//	      First create a device-independent bitmap (GdiPlus::Bitmap), then convert to a
+		//		  device-compatible bitmap for WinAPI use.
+		// References:
+		//        https://github.com/nakst/imgview/blob/d3e918b7f65cfb5a595b1b756c69cd1c1a30b13e/imgview.cpp#L574
+
+		Gdiplus::Bitmap dib(new_size.x, new_size.y, mapped_resource.RowPitch, PixelFormat32bppARGB, data);
+		if (dib.GetLastStatus() != Gdiplus::Ok) {
+			printf("Failed to create GDI+ bitmap\n");
+			return 1;
+		}
+
+		HBITMAP hdib;
+		dib.GetHBITMAP(0, &hdib);
+
+		DIBSECTION hdibs;
+		GetObject(hdib, sizeof(hdibs), &hdibs);
+
+		HBITMAP ddb = CreateDIBitmap(hdc, &hdibs.dsBmih, CBM_INIT, hdibs.dsBm.bmBits, (const BITMAPINFO*)&hdibs.dsBmih, DIB_RGB_COLORS);
+		if (!ddb) {
+			printf("Failed to to convert GDI+ bitmap to a device-compatible bitmap\n");
+			return 1;
+		}
+
+		if (!OpenClipboard(NULL)) {
+			printf("Failed to open clipboard\n");
+			return 1;
+		}
+		EmptyClipboard();
+		SetClipboardData(CF_BITMAP, ddb);
+		CloseClipboard();
+
+		DeleteObject(ddb);
+
+		goto cleanup;
+	}
+
 	// Read the pixel value BGRA (!)
 	CoInitialize(NULL);
-	IWICBitmapEncoder *encoder = 0;
-	IWICStream* stream = 0;
-	IWICBitmapFrameEncode* frame = 0;
 	IPropertyBag2 *property_bag = NULL;
 	WICPixelFormatGUID req_pixel_format = GUID_WICPixelFormat32bppBGRA; // Direct3D defaults to BGRA for some reason
 	WICPixelFormatGUID pixel_format = req_pixel_format; 
@@ -3051,8 +3094,16 @@ static void update_logic() {
 		G->force_loop_frames++;
 	}
 	if (G->files.Count > 0 && keyup(Key_C)) {
-		G->crop_mode = !G->crop_mode;
-		G->force_loop_frames++;
+		if (keypress(Key_Ctrl)) {
+			if (SUCCEEDED(save_image(Format_Bmp, NULL, true))) {
+				push_alert("Image copied successfully!", Alert_Info);
+			} else {
+				push_alert("Failed to copy image to clipboard");
+			}
+		} else {
+			G->crop_mode = !G->crop_mode;
+			G->force_loop_frames++;
+		}
 	}
 
     {
