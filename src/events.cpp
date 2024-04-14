@@ -17,7 +17,7 @@ void reset_inputs() {
     K->scroll_y_diff = 0;
 	K->double_click = 0;
 }
-static void set_framebuffer_size(Graphics *ctx, iv2 size);
+static void set_framebuffer_size(Graphics *ctx, iv2 size, bool set_dpi = false);
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     Keys *K = &G->keys;
@@ -31,6 +31,25 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         WW = rect.right - rect.left;
         WH = rect.bottom - rect.top;
 		set_framebuffer_size(&G->graphics,  iv2(WW, WH));
+
+		G->minimized = false;
+		if (wParam == SIZE_MINIMIZED)
+			G->minimized = true;
+		SwitchToFiber(G->main_loop_fiber);
+		break;
+    }
+	case WM_DPICHANGED:
+    {
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+        WW = rect.right - rect.left;
+        WH = rect.bottom - rect.top;
+		set_framebuffer_size(&G->graphics,  iv2(WW, WH), true);
+
+		G->minimized = false;
+		if (wParam == SIZE_MINIMIZED)
+			G->minimized = true;
+
 		break;
     }
     case WM_DROPFILES:  {
@@ -247,27 +266,30 @@ void wait_loop(MSG *msg) {
 	}
 }
 
-static void PollEvents() {
+static void CALLBACK poll_events(void* lpParameter) {
     static MSG msg  {};
     Keys *K = &G->keys;
+	while (true)
+	{
+		if (G->force_loop || G->force_loop_frames > 0)
+			run_loop(&msg);
+		else
+			wait_loop(&msg);
 
-	if (G->force_loop || G->force_loop_frames > 0)
-		run_loop(&msg);
-	else
-		wait_loop(&msg);
+		if (G->force_loop_frames > 0)
+			--G->force_loop_frames;
+		G->force_loop = 0;
 
-	if (G->force_loop_frames > 0)
-		--G->force_loop_frames;
-	G->force_loop = 0;
-
-	static POINT prevMousePos { 0 };
-	POINT p;
-	GetCursorPos(&p);
-	ScreenToClient(hwnd, &p);
-	K->Mouse.x = p.x; K->Mouse.y = p.y;
-	K->Mouse_rel.x = p.x - prevMousePos.x;
-	K->Mouse_rel.y = p.y - prevMousePos.y;
-	prevMousePos.x = p.x; prevMousePos.y = p.y;
+		static POINT prevMousePos { 0 };
+		POINT p;
+		GetCursorPos(&p);
+		ScreenToClient(hwnd, &p);
+		K->Mouse.x = p.x; K->Mouse.y = p.y;
+		K->Mouse_rel.x = p.x - prevMousePos.x;
+		K->Mouse_rel.y = p.y - prevMousePos.y;
+		prevMousePos.x = p.x; prevMousePos.y = p.y;
+		SwitchToFiber(G->main_loop_fiber);
+	}
 }
 
 inline bool keypress(int i) {

@@ -1,3 +1,5 @@
+
+*.vsidx
+*.db
 .vs/*
 bin/*
-*.vsidx

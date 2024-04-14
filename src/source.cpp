@@ -169,16 +169,23 @@ static void upload_texture(Texture* texture, void* data, u64 size) {
 	G->graphics.device_ctx->Unmap(texture->d3d_texture, 0);
 }
 
-static void set_framebuffer_size(Graphics *ctx, iv2 size) {
+static void set_framebuffer_size(Graphics *ctx, iv2 size, bool set_dpi) {
 	if (ctx == nullptr) 				return;
 	if (ctx->viewport_size == size) 	return;
 	if (ctx->frame_buffer == nullptr) 	return;
 	if (size.x <= 0 || size.y <= 0) 	return;
 
 	// resize swapchain
+
+	float dpi_scale_factor = 1;
+	if (set_dpi) {
+		UINT dpi = GetDpiForWindow(hwnd);
+		dpi_scale_factor = dpi / 96.0f;
+	}
+
 	ctx->frame_buffer_view->Release();
 	ctx->frame_buffer->Release();
-	ctx->swap_chain->ResizeBuffers(0, size.x, size.y, DXGI_FORMAT_UNKNOWN, 0);
+	ctx->swap_chain->ResizeBuffers(0, size.x / dpi_scale_factor, size.y / dpi_scale_factor, DXGI_FORMAT_UNKNOWN, 0);
 	ctx->swap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&ctx->frame_buffer);
 	ctx->device->CreateRenderTargetView(ctx->frame_buffer, nullptr, &ctx->frame_buffer_view);
 
@@ -218,7 +225,7 @@ static void init_d3d11(HWND window_handle, int ww, int wh) {
 	ID3D11DeviceContext* base_device_ctx;
 	UINT createDeviceFlags = 0;
 #if DEBUG_MODE
-	createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+	//createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
 	D3D11CreateDevice(
@@ -561,6 +568,12 @@ static void init_all() {
     pfd.cColorBits = 32;
     pfd.cDepthBits = 24;
     pfd.cStencilBits = 8;
+
+	SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+
+	Gdiplus::GdiplusStartupInput gdipsi;
+	ULONG_PTR gdipt;
+	Gdiplus::GdiplusStartup(&gdipt, &gdipsi, NULL);
 
 	init_d3d11(hwnd, WW, WH);
 	init_logo_image();
@@ -1637,11 +1650,15 @@ static GUID get_GUID(Encoder_Format encoder_format) {
 	}
 }
 
-static HRESULT save_image(Encoder_Format encoder_format, wchar_t* path) {
+static HRESULT save_image(Encoder_Format encoder_format, wchar_t* path, bool clipboard = false) {
 	Graphics* ctx = &G->graphics;
 
-	HRESULT hr;
-	if (path == 0) {
+	IWICBitmapEncoder* encoder = 0;
+	IWICStream* stream = 0;
+	IWICBitmapFrameEncode* frame = 0;
+
+	HRESULT hr = 0;
+	if (!clipboard && path == 0) {
 		push_alert("Failed to fetch file path from `save as` dialogue.");
 		return -1;
 	}
@@ -1728,11 +1745,46 @@ static HRESULT save_image(Encoder_Format encoder_format, wchar_t* path) {
 		goto cleanup;
 	}
 
+	if (clipboard) {
+		// @hkva: GdiPlus required here as Gdi32 does not easily support bitmaps with alpha channels.
+		//	      First create a device-independent bitmap (GdiPlus::Bitmap), then convert to a
+		//		  device-compatible bitmap for WinAPI use.
+		// References:
+		//        https://github.com/nakst/imgview/blob/d3e918b7f65cfb5a595b1b756c69cd1c1a30b13e/imgview.cpp#L574
+
+		Gdiplus::Bitmap dib(new_size.x, new_size.y, mapped_resource.RowPitch, PixelFormat32bppARGB, data);
+		if (dib.GetLastStatus() != Gdiplus::Ok) {
+			printf("Failed to create GDI+ bitmap\n");
+			return 1;
+		}
+
+		HBITMAP hdib;
+		dib.GetHBITMAP(0, &hdib);
+
+		DIBSECTION hdibs;
+		GetObject(hdib, sizeof(hdibs), &hdibs);
+
+		HBITMAP ddb = CreateDIBitmap(hdc, &hdibs.dsBmih, CBM_INIT, hdibs.dsBm.bmBits, (const BITMAPINFO*)&hdibs.dsBmih, DIB_RGB_COLORS);
+		if (!ddb) {
+			printf("Failed to to convert GDI+ bitmap to a device-compatible bitmap\n");
+			return 1;
+		}
+
+		if (!OpenClipboard(NULL)) {
+			printf("Failed to open clipboard\n");
+			return 1;
+		}
+		EmptyClipboard();
+		SetClipboardData(CF_BITMAP, ddb);
+		CloseClipboard();
+
+		DeleteObject(ddb);
+
+		goto cleanup;
+	}
+
 	// Read the pixel value BGRA (!)
 	CoInitialize(NULL);
-	IWICBitmapEncoder *encoder = 0;
-	IWICStream* stream = 0;
-	IWICBitmapFrameEncode* frame = 0;
 	IPropertyBag2 *property_bag = NULL;
 	WICPixelFormatGUID req_pixel_format = GUID_WICPixelFormat32bppBGRA; // Direct3D defaults to BGRA for some reason
 	WICPixelFormatGUID pixel_format = req_pixel_format; 
@@ -1793,28 +1845,32 @@ static HRESULT save_image(Encoder_Format encoder_format, wchar_t* path) {
 }
 
 
-HRESULT save_as_dialogue(Encoder_Format selected_encoder) {
+HRESULT save_as_dialogue() {
 	IFileSaveDialog *dialogue = 0;
 	IShellItem *item = 0;
 	PWSTR file_path = 0;
+	UINT selected_encoder_index = 0;
 
 	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 	HRESULT hr = CoCreateInstance(CLSID_FileSaveDialog, NULL, CLSCTX_ALL, 
-	                              IID_IFileSaveDialog, reinterpret_cast<void**>(&dialogue));
-	COMDLG_FILTERSPEC extensions[] = { { L"All Files", L"*.*" } };
+	                              IID_IFileSaveDialog, reinterpret_cast<void**>(&dialogue));	
 
 	if (dialogue == 0)
 		goto cleanup;
 	if (SUCCEEDED(hr))
-		hr = dialogue->SetFileTypes(1, extensions);
+		hr = dialogue->SetDefaultExtension(L"");
+	if (SUCCEEDED(hr))
+		hr = dialogue->SetFileTypes(array_size(encoder_formats_filter), encoder_formats_filter);
 	if (SUCCEEDED(hr))
 		hr = dialogue->Show(NULL);
 	if (SUCCEEDED(hr))
 		hr = dialogue->GetResult(&item);
 	if (SUCCEEDED(hr))
+		hr = dialogue->GetFileTypeIndex(&selected_encoder_index);
+	if (SUCCEEDED(hr))
 		hr = item->GetDisplayName(SIGDN_FILESYSPATH, &file_path);
 	if (SUCCEEDED(hr)) {
-		hr = save_image(selected_encoder, file_path);
+		hr = save_image((Encoder_Format)(selected_encoder_index - 1), file_path);
 	}
 
 	cleanup:
@@ -2305,7 +2361,9 @@ static void update_gui() {
 					style.color_bg.active = theme->pos_btn_2;
 					style.size = btn_size;
 					if (UI_button(&style, "save as")) {
-						G->save_as_visible = !G->save_as_visible;
+						if (SUCCEEDED(save_as_dialogue() )) {
+							push_alert("Image saved successfully!", Alert_Info);
+						}
 					}
 				}
 				UI_push_parent_defer(ctx, UI_bar(axis_y))
@@ -2698,73 +2756,6 @@ static void update_gui() {
 	}
 	static bool save_as_popup_open = false;
 
-	if (G->save_as_visible || save_as_popup_open) {
-		UI_set_disabled(false);
-		save_as_popup_open = false;
-
-		UI_Block *frame = UI_push_block(ctx, 0);
-		frame->style.size[axis_x] = {UI_Size_t::pixels, f32(WW), 1};
-		frame->style.size[axis_y] = {UI_Size_t::pixels, f32(WH), 1};
-		frame->style.layout.align[axis_y] = align_center;
-		frame->style.layout.align[axis_x] = align_center;
-
-		UI_Block *save_as_menu = UI_push_block(ctx, frame);
-		save_as_menu->style.size[axis_x] = { UI_Size_t::sum_of_children, 300, 1 };
-		save_as_menu->style.size[axis_y] = { UI_Size_t::sum_of_children, 0, 1 };
-		save_as_menu->style.color[c_background] = theme->bg_main_0;
-		save_as_menu->style.layout.padding = v2(8);
-		save_as_menu->style.layout.spacing = v2(5);
-		save_as_menu->style.layout.axis = axis_x;
-		save_as_menu->style.roundness = v4(8);
-		save_as_menu->flags |= UI_Block_Flags_draw_background;
-		save_as_menu->hash = UI_hash_djb2(ctx, "save_as_menu");
-		save_as_menu->depth_level += 200;
-		G->check_mouse_hashes.push_back(save_as_menu->hash);
-
-		UI_Button_Style style = btn_default;
-		style.color_bg.base = theme->pos_btn_0;
-		style.color_bg.hot = theme->pos_btn_1;
-		style.color_bg.active = theme->pos_btn_2;
-		style.size = v2(100, 27);
-		static int selected_encoder = 0;
-
-		UI_Combo_Style combo_style = default_combo_style;
-		combo_style.btn_size = style.size;
-		combo_style.item_size = v2(style.size.x, 20);
-
-		bool keep = false;
-		UI_push_parent_defer(ctx, save_as_menu) {
-			UI_push_parent_defer(ctx, UI_bar(axis_y)) {
-				UI_Block* bar = UI_get_current_parent(ctx);
-				bar->style.size[axis_y] = { UI_Size_t::pixels, style.size.y, 1 };
-				bar->style.layout.align[axis_y] = align_center;
-				UI_text(theme->text_reg_light, G->ui_font, 12, "Codec: ");
-			}
-			
-			UI_Combo_Return combo_return = UI_combo(&combo_style, "save as encoder", &selected_encoder, encoder_formats_str, array_size(encoder_formats_str));
-			save_as_popup_open |= combo_return.popup;
-			keep = combo_return.changed;
-			if (combo_return.bounding_box)
-				G->check_mouse_hashes.push_back(combo_return.bounding_box->hash);
-			if (UI_button(&style, "save image...")) {
-				if (SUCCEEDED(save_as_dialogue((Encoder_Format) selected_encoder) )) {
-					push_alert("Image saved successfully!", Alert_Info);
-					G->save_as_visible = false;
-				}
-			}
-		}
-
-		UI_Block *menu_ref = UI_find_block(ctx, save_as_menu->hash, UI_PREVIOUS);
-		if (menu_ref) {
-			if (!save_as_popup_open && !UI_point_in_rect(menu_ref->position, menu_ref->position + menu_ref->size, UI_get_mouse())) {
-				if (!keep && keydn(MouseL))
-					G->save_as_visible = false;
-			}
-		}
-
-		UI_reset_disabled();
-	}
-
 	static bool settings_popup_open = false;
 	if (G->settings_visible || settings_popup_open) {
 		UI_set_disabled(false);
@@ -3135,8 +3126,16 @@ static void update_logic() {
 		G->force_loop_frames++;
 	}
 	if (G->files.Count > 0 && keyup(Key_C)) {
-		G->crop_mode = !G->crop_mode;
-		G->force_loop_frames++;
+		if (keypress(Key_Ctrl)) {
+			if (SUCCEEDED(save_image(Format_Bmp, NULL, true))) {
+				push_alert("Image copied successfully!", Alert_Info);
+			} else {
+				push_alert("Failed to copy image to clipboard");
+			}
+		} else {
+			G->crop_mode = !G->crop_mode;
+			G->force_loop_frames++;
+		}
 	}
 
     {
@@ -3321,7 +3320,7 @@ static void render() {
 			if ((G->files[G->current_file_index].type == TYPE_GIF || G->files[G->current_file_index].type == TYPE_WEBP_ANIM) && G->anim_frames > 0) {
 				static uint32_t time = 0;
 				uint32_t delta = get_ticks() - time;
-				if (G->anim_play)
+				if (G->anim_play && !G->minimized)
 					G->force_loop = true;
 				if (delta >= G->anim_frame_delays[G->anim_index] && G->anim_play) {
 					G->anim_index++;

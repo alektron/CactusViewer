@@ -32,11 +32,13 @@
 #include <wincodec.h>
 #include <propidl.h>
 #include <dwmapi.h>
+#include <ShellScalingAPI.h>
+#pragma comment(lib, "Shcore.lib")
 
 #define _MAX_FPS 250;
 
-#define VERSION_N "2.1.1"
-#define VERSION VERSION_N" - 08/10/23"
+#define VERSION_N "2.1.3"
+#define VERSION VERSION_N" - 18/12/23"
 
 #define handle_signal(signal) for(int _i_ = (signal); _i_; _i_ = 0, (signal = false))
 #define send_signal(signal) signal = true

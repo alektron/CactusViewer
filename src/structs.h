@@ -283,6 +283,21 @@ char* encoder_formats_str[] = {
 	//"Raw"
 };
 
+COMDLG_FILTERSPEC encoder_formats_filter[] = {
+	{ L"BMP", 	L"*.bmp;*.dib" },
+	{ L"PNG", 	L"*.png" },
+	// ICO
+	// JPEG
+	{ L"TIFF",	L"*.tiff;*.tif" },
+	// GIF
+	// WMP
+	{ L"DDS",	L"*.dds" },
+	// ADNG
+	{ L"HEIF",	L"*.heif;*.heifs;*.heic;*.heics;*.avci;*.avcs;*.avif;*.HIF" },
+	// WEBP
+	// RAW
+};
+
 struct Image
 {
 	int w;
@@ -473,9 +488,14 @@ struct Global
 
 	HCURSOR hcursor[Cursor_Type_count];
 
+	bool minimized = false;
+
 	bool force_loop;
 	i32 force_loop_frames;
 	HANDLE loader_event;
+
+	LPVOID main_loop_fiber = NULL;
+	LPVOID message_loop_fiber = NULL;
 
 	UI_Context *ui;
 	UI_Font* ui_font;
@@ -510,7 +530,6 @@ struct Global
     int anim_frames;
     bool anim_loaded;
     bool settings_visible;
-    bool save_as_visible;
     bool exif_data_visible;
     bool dropped_file;
     bool loading_dropped_file;
