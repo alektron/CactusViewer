@@ -7,7 +7,7 @@ RC /nologo src/res.rc
 if not exist bin md bin
 pushd bin
 
-set Libs= /LIBPATH:..\lib shell32.lib d3d11.lib d3dcompiler.lib shell32.lib Ole32.lib User32.lib freetype.lib libwebp.lib libwebpdecoder.lib windowscodecs.lib dwmapi.lib /LIBPATH:..\src res.res
+set Libs= /LIBPATH:..\lib shell32.lib d3d11.lib d3dcompiler.lib shell32.lib Ole32.lib User32.lib Gdi32.lib Gdiplus.lib freetype.lib libwebp.lib libwebpdecoder.lib windowscodecs.lib dwmapi.lib /LIBPATH:..\src res.res
 set CompileFlags=/nologo /utf-8 /I ..\include /I ..\include\ui /I ..\include\webp /I ..\include\easyexif
 set LinkFlags=/OUT:CactusViewer.exe /IGNORE:4099 /debug /subsystem:Windows %Libs%
 
