@@ -15,7 +15,7 @@ UI_Theme *UI_get_theme() {
 		themes[UI_Theme_Cactus_Green].bg_main_2_d = 	UI_color4_sld_u32(0x555555ff);
 		themes[UI_Theme_Cactus_Green].bg_main_3 = 		UI_color4_sld_u32(0x9ca19aff);
 		themes[UI_Theme_Cactus_Green].bg_main_4 = 		UI_color4_sld_u32(0x2d362bff);
-		themes[UI_Theme_Cactus_Green].bg_sub = 			UI_color4_sld_u32(0x222222FF);
+		themes[UI_Theme_Cactus_Green].bg_sub = 			UI_color4_sld_u32(0x161f14FF);
 		themes[UI_Theme_Cactus_Green].border_main = 	UI_color4_sld_u32(0x444444FF);
 		themes[UI_Theme_Cactus_Green].separator = 		UI_color4_sld_v3(v3(.5));
 		themes[UI_Theme_Cactus_Green].text_reg_main = 	UI_color4_sld_u32(0xFFFFFFFF);
@@ -30,76 +30,135 @@ UI_Theme *UI_get_theme() {
 		themes[UI_Theme_Cactus_Green].text_slider_0 = 	UI_color4_sld_u32(0xFFFFFFBB);
 		themes[UI_Theme_Cactus_Green].text_slider_1 = 	UI_color4_sld_u32(0xFFFF00BB);
 		themes[UI_Theme_Cactus_Green].text_slider_2 = 	UI_color4_sld_u32(0xFFFF00FF);
-		themes[UI_Theme_Cactus_Green].pos_btn_0 = 		UI_color4_sld_u32(0x389c3cff);
-		themes[UI_Theme_Cactus_Green].pos_btn_1 = 		UI_color4_sld_u32(0x4ec652ff);
-		themes[UI_Theme_Cactus_Green].pos_btn_2 = 		UI_color4_sld_u32(0x2d7b2fff);
-		themes[UI_Theme_Cactus_Green].neg_btn_0 = 		UI_color4_sld_u32(0x8a4e2eff);
-		themes[UI_Theme_Cactus_Green].neg_btn_1 = 		UI_color4_sld_u32(0xaf643aff);
-		themes[UI_Theme_Cactus_Green].neg_btn_2 = 		UI_color4_sld_u32(0x512e1bff);
+		themes[UI_Theme_Cactus_Green].pos_btn_0 = 		UI_color4_sld_u32(0x266a28ff);
+		themes[UI_Theme_Cactus_Green].pos_btn_1 = 		UI_color4_sld_u32(0x358637ff);
+		themes[UI_Theme_Cactus_Green].pos_btn_2 = 		UI_color4_sld_u32(0x1e5315ff);
+		themes[UI_Theme_Cactus_Green].neg_btn_0 = 		UI_color4_sld_u32(0x972121ff);
+		themes[UI_Theme_Cactus_Green].neg_btn_1 = 		UI_color4_sld_u32(0xbf2a2aff);
+		themes[UI_Theme_Cactus_Green].neg_btn_2 = 		UI_color4_sld_u32(0x591313ff);
 
-		themes[UI_Theme_Dark_Blue].bg_main_0 = 			UI_color4_sld_u32(0x251c27ff);
-		themes[UI_Theme_Dark_Blue].bg_main_1 = 			UI_color4_sld_u32(0x3e2f41ff);
-		themes[UI_Theme_Dark_Blue].bg_main_1_d = 		UI_color4_sld_u32(0x444444FF);
-		themes[UI_Theme_Dark_Blue].bg_main_2 = 			UI_color4_sld_u32(0x6c5d6fff);
-		themes[UI_Theme_Dark_Blue].bg_main_2_d = 		UI_color4_sld_u32(0x555555ff);
-		themes[UI_Theme_Dark_Blue].bg_main_3 = 			UI_color4_sld_u32(0x9e93a3ff);
-		themes[UI_Theme_Dark_Blue].bg_main_4 = 			UI_color4_sld_u32(0x302432ff);
-		themes[UI_Theme_Dark_Blue].bg_sub = 			UI_color4_sld_u32(0x222222FF);
-		themes[UI_Theme_Dark_Blue].border_main = 		UI_color4_sld_u32(0x444444FF);
-		themes[UI_Theme_Dark_Blue].separator = 			UI_color4_sld_v3(v3(.5));
-		themes[UI_Theme_Dark_Blue].text_reg_main = 		UI_color4_sld_u32(0xFFFFFFFF);
-		themes[UI_Theme_Dark_Blue].text_reg_main_d =	UI_color4_sld_u32(0x888888FF);
-		themes[UI_Theme_Dark_Blue].text_reg_light = 	UI_color4_sld_v3(v3(.95));
-		themes[UI_Theme_Dark_Blue].text_reg_mid = 		UI_color4_sld_v3(v3(.7));
-		themes[UI_Theme_Dark_Blue].text_error = 		UI_color4_sld_v3(v3(1, 0.3, 0));
-		themes[UI_Theme_Dark_Blue].text_info = 			UI_color4_sld_v3(v3(1, 0.9, 0));
-		themes[UI_Theme_Dark_Blue].text_header_0 = 		UI_color4_sld_v3(v3(1, 1, 0));
-		themes[UI_Theme_Dark_Blue].text_header_1 = 		UI_color4_sld_v3(v3(1, .7, 0));
-		themes[UI_Theme_Dark_Blue].text_header_2 = 		UI_color4_sld_v3(v3(.7, .7, 1));
-		themes[UI_Theme_Dark_Blue].text_slider_0 = 		UI_color4_sld_u32(0xFFFFFFBB);
-		themes[UI_Theme_Dark_Blue].text_slider_1 = 		UI_color4_sld_u32(0xFFFF00BB);
-		themes[UI_Theme_Dark_Blue].text_slider_2 = 		UI_color4_sld_u32(0xFFFF00FF);
-		themes[UI_Theme_Dark_Blue].pos_btn_0 = 			UI_color4_sld_u32(0x2d7b2fff);
-		themes[UI_Theme_Dark_Blue].pos_btn_1 = 			UI_color4_sld_u32(0x389c3cff);
-		themes[UI_Theme_Dark_Blue].pos_btn_2 = 			UI_color4_sld_u32(0x1a481cff);
-		themes[UI_Theme_Dark_Blue].neg_btn_0 = 			UI_color4_sld_u32(0x8a4e2eff);
-		themes[UI_Theme_Dark_Blue].neg_btn_1 = 			UI_color4_sld_u32(0xaf643aff);
-		themes[UI_Theme_Dark_Blue].neg_btn_2 = 			UI_color4_sld_u32(0x512e1bff);
+		themes[UI_Theme_Dark_Purple].bg_main_0 = 		UI_color4_sld_u32(0x251c27ff);
+		themes[UI_Theme_Dark_Purple].bg_main_1 = 		UI_color4_sld_u32(0x3e2f41ff);
+		themes[UI_Theme_Dark_Purple].bg_main_1_d = 		UI_color4_sld_u32(0x444444FF);
+		themes[UI_Theme_Dark_Purple].bg_main_2 = 		UI_color4_sld_u32(0x6c5d6fff);
+		themes[UI_Theme_Dark_Purple].bg_main_2_d = 		UI_color4_sld_u32(0x555555ff);
+		themes[UI_Theme_Dark_Purple].bg_main_3 = 		UI_color4_sld_u32(0x9e93a3ff);
+		themes[UI_Theme_Dark_Purple].bg_main_4 = 		UI_color4_sld_u32(0x302432ff);
+		themes[UI_Theme_Dark_Purple].bg_sub = 			UI_color4_sld_u32(0x201023FF);
+		themes[UI_Theme_Dark_Purple].border_main = 		UI_color4_sld_u32(0x444444FF);
+		themes[UI_Theme_Dark_Purple].separator = 		UI_color4_sld_v3(v3(.5));
+		themes[UI_Theme_Dark_Purple].text_reg_main = 	UI_color4_sld_u32(0xFFFFFFFF);
+		themes[UI_Theme_Dark_Purple].text_reg_main_d =	UI_color4_sld_u32(0x888888FF);
+		themes[UI_Theme_Dark_Purple].text_reg_light = 	UI_color4_sld_v3(v3(.95));
+		themes[UI_Theme_Dark_Purple].text_reg_mid = 	UI_color4_sld_v3(v3(.7));
+		themes[UI_Theme_Dark_Purple].text_error = 		UI_color4_sld_v3(v3(1, 0.3, 0));
+		themes[UI_Theme_Dark_Purple].text_info = 		UI_color4_sld_v3(v3(1, 0.9, 0));
+		themes[UI_Theme_Dark_Purple].text_header_0 = 	UI_color4_sld_v3(v3(1, 1, 0));
+		themes[UI_Theme_Dark_Purple].text_header_1 = 	UI_color4_sld_v3(v3(1, .7, 0));
+		themes[UI_Theme_Dark_Purple].text_header_2 = 	UI_color4_sld_v3(v3(.7, .7, 1));
+		themes[UI_Theme_Dark_Purple].text_slider_0 = 	UI_color4_sld_u32(0xFFFFFFBB);
+		themes[UI_Theme_Dark_Purple].text_slider_1 = 	UI_color4_sld_u32(0xFFFF00BB);
+		themes[UI_Theme_Dark_Purple].text_slider_2 = 	UI_color4_sld_u32(0xFFFF00FF);
+		themes[UI_Theme_Dark_Purple].pos_btn_0 = 		UI_color4_sld_u32(0x266a28ff);
+		themes[UI_Theme_Dark_Purple].pos_btn_1 = 		UI_color4_sld_u32(0x358637ff);
+		themes[UI_Theme_Dark_Purple].pos_btn_2 = 		UI_color4_sld_u32(0x1e5315ff);
+		themes[UI_Theme_Dark_Purple].neg_btn_0 = 		UI_color4_sld_u32(0x972121ff);
+		themes[UI_Theme_Dark_Purple].neg_btn_1 = 		UI_color4_sld_u32(0xbf2a2aff);
+		themes[UI_Theme_Dark_Purple].neg_btn_2 = 		UI_color4_sld_u32(0x591313ff);
 
-		themes[UI_Theme_Light].bg_main_0 = 				UI_color4_sld_u32(0xffffffff);
-		themes[UI_Theme_Light].bg_main_1 = 				UI_color4_sld_u32(0xe1d8e3ff);
-		themes[UI_Theme_Light].bg_main_2 = 				UI_color4_sld_u32(0xcdbed0ff);
-		themes[UI_Theme_Light].bg_main_3 = 				UI_color4_sld_u32(0x9f90a2ff);
-		themes[UI_Theme_Light].bg_main_4 = 				UI_color4_sld_u32(0x675c6cff);
-		themes[UI_Theme_Light].bg_main_1_d = 			UI_color4_sld_u32(0xbdbdbdFF);
-		themes[UI_Theme_Light].bg_main_2_d = 			UI_color4_sld_u32(0x919191ff);
-		themes[UI_Theme_Light].bg_sub = 				UI_color4_sld_u32(0xeeeeeeFF);
-		themes[UI_Theme_Light].border_main = 			UI_color4_sld_u32(0xf1edf2FF);
-		themes[UI_Theme_Light].separator = 				UI_color4_sld_v3(v3(.5));
-		themes[UI_Theme_Light].text_reg_main = 			UI_color4_sld_u32(0x000000FF);
-		themes[UI_Theme_Light].text_reg_main_d =		UI_color4_sld_u32(0x3d3d3dFF);
-		themes[UI_Theme_Light].text_reg_light = 		UI_color4_sld_v3(v3(.05));
-		themes[UI_Theme_Light].text_reg_mid = 			UI_color4_sld_v3(v3(.3));
-		themes[UI_Theme_Light].text_error = 			UI_color4_sld_v3(v3(1, 0.3, 0));
-		themes[UI_Theme_Light].text_info = 				UI_color4_sld_v3(v3(.5, .5, 0));
-		themes[UI_Theme_Light].text_header_0 = 			UI_color4_sld_v3(v3(.5, .5, 0));
-		themes[UI_Theme_Light].text_header_1 = 			UI_color4_sld_v3(v3(.8, .5, 0));
-		themes[UI_Theme_Light].text_header_2 = 			UI_color4_sld_v3(v3(.3, .3, .6));
-		themes[UI_Theme_Light].text_slider_0 = 			UI_color4_sld_u32(0x000000BB);
-		themes[UI_Theme_Light].text_slider_1 = 			UI_color4_sld_u32(0x363d00BB);
-		themes[UI_Theme_Light].text_slider_2 = 			UI_color4_sld_u32(0xFFFF00FF);
-		themes[UI_Theme_Light].pos_btn_0 = 				UI_color4_sld_u32(0x56d55cff);
-		themes[UI_Theme_Light].pos_btn_1 = 				UI_color4_sld_u32(0x49ab4bff);
-		themes[UI_Theme_Light].pos_btn_2 = 				UI_color4_sld_u32(0x306b33ff);
-		themes[UI_Theme_Light].neg_btn_0 = 				UI_color4_sld_u32(0xff9c6fff);
-		themes[UI_Theme_Light].neg_btn_1 = 				UI_color4_sld_u32(0xfe7245ff);
-		themes[UI_Theme_Light].neg_btn_2 = 				UI_color4_sld_u32(0x9b4b2eff);
+		themes[UI_Theme_Cyber_Blue].bg_main_0 = 		UI_color4_sld_u32(0x181840ff);
+		themes[UI_Theme_Cyber_Blue].bg_main_1 = 		UI_color4_sld_u32(0x404080ff);
+		themes[UI_Theme_Cyber_Blue].bg_main_1_d = 		UI_color4_sld_u32(0x444444FF);
+		themes[UI_Theme_Cyber_Blue].bg_main_2 = 		UI_color4_sld_u32(0x5b5bb9ff);
+		themes[UI_Theme_Cyber_Blue].bg_main_2_d = 		UI_color4_sld_u32(0x555555ff);
+		themes[UI_Theme_Cyber_Blue].bg_main_3 = 		UI_color4_sld_u32(0x8a8af1ff);
+		themes[UI_Theme_Cyber_Blue].bg_main_4 = 		UI_color4_sld_u32(0x2b2b5bff);
+		themes[UI_Theme_Cyber_Blue].bg_sub = 			UI_color4_sld_u32(0x0f0f34FF);
+		themes[UI_Theme_Cyber_Blue].border_main = 		UI_color4_sld_u32(0x444444FF);
+		themes[UI_Theme_Cyber_Blue].separator = 		UI_color4_sld_v3(v3(.5));
+		themes[UI_Theme_Cyber_Blue].text_reg_main = 	UI_color4_sld_u32(0xFFFFFFFF);
+		themes[UI_Theme_Cyber_Blue].text_reg_main_d = 	UI_color4_sld_u32(0x888888FF);
+		themes[UI_Theme_Cyber_Blue].text_reg_light = 	UI_color4_sld_v3(v3(.95));
+		themes[UI_Theme_Cyber_Blue].text_reg_mid = 		UI_color4_sld_v3(v3(.7));
+		themes[UI_Theme_Cyber_Blue].text_error = 		UI_color4_sld_v3(v3(1, 0.3, 0));
+		themes[UI_Theme_Cyber_Blue].text_info = 		UI_color4_sld_v3(v3(1, 0.9, 0));
+		themes[UI_Theme_Cyber_Blue].text_header_0 = 	UI_color4_sld_v3(v3(1, 1, 0));
+		themes[UI_Theme_Cyber_Blue].text_header_1 = 	UI_color4_sld_v3(v3(1, .7, 0));
+		themes[UI_Theme_Cyber_Blue].text_header_2 = 	UI_color4_sld_v3(v3(.7, .7, 1));
+		themes[UI_Theme_Cyber_Blue].text_slider_0 = 	UI_color4_sld_u32(0xFFFFFFBB);
+		themes[UI_Theme_Cyber_Blue].text_slider_1 = 	UI_color4_sld_u32(0xFFFF00BB);
+		themes[UI_Theme_Cyber_Blue].text_slider_2 = 	UI_color4_sld_u32(0xFFFF00FF);
+		themes[UI_Theme_Cyber_Blue].pos_btn_0 = 		UI_color4_sld_u32(0x266a28ff);
+		themes[UI_Theme_Cyber_Blue].pos_btn_1 = 		UI_color4_sld_u32(0x358637ff);
+		themes[UI_Theme_Cyber_Blue].pos_btn_2 = 		UI_color4_sld_u32(0x1e5315ff);
+		themes[UI_Theme_Cyber_Blue].neg_btn_0 = 		UI_color4_sld_u32(0x972121ff);
+		themes[UI_Theme_Cyber_Blue].neg_btn_1 = 		UI_color4_sld_u32(0xbf2a2aff);
+		themes[UI_Theme_Cyber_Blue].neg_btn_2 = 		UI_color4_sld_u32(0x591313ff);
+
+		themes[UI_Theme_Crimson_Black].bg_main_0 = 		UI_color4_sld_u32(0x0a0a0aff);
+		themes[UI_Theme_Crimson_Black].bg_main_1 = 		UI_color4_sld_u32(0x4d1111ff);
+		themes[UI_Theme_Crimson_Black].bg_main_1_d = 	UI_color4_sld_u32(0x444444FF);
+		themes[UI_Theme_Crimson_Black].bg_main_2 = 		UI_color4_sld_u32(0x852525ff);
+		themes[UI_Theme_Crimson_Black].bg_main_2_d = 	UI_color4_sld_u32(0x555555ff);
+		themes[UI_Theme_Crimson_Black].bg_main_3 = 		UI_color4_sld_u32(0xcb3333ff);
+		themes[UI_Theme_Crimson_Black].bg_main_4 = 		UI_color4_sld_u32(0x620707ff);
+		themes[UI_Theme_Crimson_Black].bg_sub = 		UI_color4_sld_u32(0x1f0a0aFF);
+		themes[UI_Theme_Crimson_Black].border_main = 	UI_color4_sld_u32(0x444444FF);
+		themes[UI_Theme_Crimson_Black].separator = 		UI_color4_sld_v3(v3(.5));
+		themes[UI_Theme_Crimson_Black].text_reg_main = 	UI_color4_sld_u32(0xFFFFFFFF);
+		themes[UI_Theme_Crimson_Black].text_reg_main_d =UI_color4_sld_u32(0x888888FF);
+		themes[UI_Theme_Crimson_Black].text_reg_light = UI_color4_sld_v3(v3(.95));
+		themes[UI_Theme_Crimson_Black].text_reg_mid = 	UI_color4_sld_v3(v3(.7));
+		themes[UI_Theme_Crimson_Black].text_error = 	UI_color4_sld_v3(v3(1, 0.3, 0));
+		themes[UI_Theme_Crimson_Black].text_info = 		UI_color4_sld_v3(v3(1, 0.9, 0));
+		themes[UI_Theme_Crimson_Black].text_header_0 = 	UI_color4_sld_v3(v3(1, 1, 0));
+		themes[UI_Theme_Crimson_Black].text_header_1 = 	UI_color4_sld_v3(v3(1, .7, 0));
+		themes[UI_Theme_Crimson_Black].text_header_2 = 	UI_color4_sld_v3(v3(.7, .7, 1));
+		themes[UI_Theme_Crimson_Black].text_slider_0 = 	UI_color4_sld_u32(0xFFFFFFBB);
+		themes[UI_Theme_Crimson_Black].text_slider_1 = 	UI_color4_sld_u32(0xFFFF00BB);
+		themes[UI_Theme_Crimson_Black].text_slider_2 = 	UI_color4_sld_u32(0xFFFF00FF);
+		themes[UI_Theme_Crimson_Black].pos_btn_0 = 		UI_color4_sld_u32(0x266a28ff);
+		themes[UI_Theme_Crimson_Black].pos_btn_1 = 		UI_color4_sld_u32(0x358637ff);
+		themes[UI_Theme_Crimson_Black].pos_btn_2 = 		UI_color4_sld_u32(0x1e5315ff);
+		themes[UI_Theme_Crimson_Black].neg_btn_0 = 		UI_color4_sld_u32(0x972121ff);
+		themes[UI_Theme_Crimson_Black].neg_btn_1 = 		UI_color4_sld_u32(0xbf2a2aff);
+		themes[UI_Theme_Crimson_Black].neg_btn_2 = 		UI_color4_sld_u32(0x591313ff);
+
+		// light
+																
+		themes[UI_Theme_Polar_White].bg_main_0 = 		UI_color4_sld_u32(0xffffffff);
+		themes[UI_Theme_Polar_White].bg_main_1 = 		UI_color4_sld_u32(0xe1d8e3ff);
+		themes[UI_Theme_Polar_White].bg_main_2 = 		UI_color4_sld_u32(0xcdbed0ff);
+		themes[UI_Theme_Polar_White].bg_main_3 = 		UI_color4_sld_u32(0x9f90a2ff);
+		themes[UI_Theme_Polar_White].bg_main_4 = 		UI_color4_sld_u32(0x675c6cff);
+		themes[UI_Theme_Polar_White].bg_main_1_d = 		UI_color4_sld_u32(0xbdbdbdFF);
+		themes[UI_Theme_Polar_White].bg_main_2_d = 		UI_color4_sld_u32(0x919191ff);
+		themes[UI_Theme_Polar_White].bg_sub = 			UI_color4_sld_u32(0xeeeeeeFF);
+		themes[UI_Theme_Polar_White].border_main = 		UI_color4_sld_u32(0xf1edf2FF);
+		themes[UI_Theme_Polar_White].separator = 		UI_color4_sld_v3(v3(.5));
+		themes[UI_Theme_Polar_White].text_reg_main = 	UI_color4_sld_u32(0x000000FF);
+		themes[UI_Theme_Polar_White].text_reg_main_d =	UI_color4_sld_u32(0x3d3d3dFF);
+		themes[UI_Theme_Polar_White].text_reg_light = 	UI_color4_sld_v3(v3(.05));
+		themes[UI_Theme_Polar_White].text_reg_mid = 	UI_color4_sld_v3(v3(.3));
+		themes[UI_Theme_Polar_White].text_error = 		UI_color4_sld_v3(v3(1, 0.3, 0));
+		themes[UI_Theme_Polar_White].text_info = 		UI_color4_sld_v3(v3(.5, .5, 0));
+		themes[UI_Theme_Polar_White].text_header_0 = 	UI_color4_sld_v3(v3(.5, .5, 0));
+		themes[UI_Theme_Polar_White].text_header_1 = 	UI_color4_sld_v3(v3(.8, .5, 0));
+		themes[UI_Theme_Polar_White].text_header_2 = 	UI_color4_sld_v3(v3(.3, .3, .6));
+		themes[UI_Theme_Polar_White].text_slider_0 = 	UI_color4_sld_u32(0x000000BB);
+		themes[UI_Theme_Polar_White].text_slider_1 = 	UI_color4_sld_u32(0x363d00BB);
+		themes[UI_Theme_Polar_White].text_slider_2 = 	UI_color4_sld_u32(0xFFFF00FF);
+		themes[UI_Theme_Polar_White].pos_btn_0 = 		UI_color4_sld_u32(0x56d55cff);
+		themes[UI_Theme_Polar_White].pos_btn_1 = 		UI_color4_sld_u32(0x49ab4bff);
+		themes[UI_Theme_Polar_White].pos_btn_2 = 		UI_color4_sld_u32(0x306b33ff);
+		themes[UI_Theme_Polar_White].neg_btn_0 = 		UI_color4_sld_u32(0xff9c6fff);
+		themes[UI_Theme_Polar_White].neg_btn_1 = 		UI_color4_sld_u32(0xfe7245ff);
+		themes[UI_Theme_Polar_White].neg_btn_2 = 		UI_color4_sld_u32(0x9b4b2eff);
 
 		init = true;
 	}
 	return &themes[G->settings_selected_theme];
 }
-char *themes_str[] {"Cactus Green", "Dark Blue", "Light Blue"};
 
 int UI_set_disabled(bool value) {
 	G->gui_disabled_backup = G->gui_disabled;
@@ -157,6 +216,7 @@ struct UI_Button_Style {
 	UI_Font* font;
 	u32 font_size;
 	v4 roundness;
+	bool dots;
 	v2 size; //ignored if zero
 };
 
@@ -206,6 +266,8 @@ bool UI_button(UI_Button_Style *style, char* name, ...) {
 	UI_Color4 color_background = box->style.color[c_background] = style->color_bg.base;
 	box->style.layout.align[axis_x] = align_center;
 	box->style.layout.align[axis_y] = align_center;
+	if (style->dots)
+		box->style.layout.align[axis_y] = align_start;
 	//box->style.layout.padding = v2(5, 2);
 	box->style.roundness = style->roundness;
 	box->flags |= UI_Block_Flags_draw_background | UI_Block_Flags_hit_test;
@@ -1431,6 +1493,80 @@ bool UI_image_edit(UI_Image_Edit_Style *style, char* label) {
 
 	return popup_open;
 }
+
+static int scan_folder(wchar_t *path);
+static void shuffle_folder();
+
+bool UI_files_reload_menu(UI_Button_Style *button_style, UI_Button_Style *button_style_inside, char* label) {
+	UI_Context *ctx = G->ui;
+	UI_Popup_Data *metadata = 0;
+	iv2 mouse = _iv2(UI_get_mouse());
+	bool clicked_outside = false;
+	bool popup_open = false;
+	static v2 spawn_pos;
+	u32 hash = UI_hash_djb2(ctx, label);
+	UI_Theme* theme = UI_get_theme();
+
+	metadata = (UI_Popup_Data *)
+		UI_find_else_allocate_data(ctx, hash, sizeof(UI_Popup_Data)).buffer;
+
+	if (UI_button(button_style, "...")) {
+		metadata->open = !metadata->open; 
+		G->force_loop_frames += 2;
+		spawn_pos = UI_get_mouse();
+	}
+	UI_tooltip("manage file order.");
+
+	if (metadata && metadata->open) {
+		popup_open = true;
+		UI_Block *popup = UI_push_block(ctx, 0);
+		popup->depth_level = UI_get_current_parent(ctx)->depth_level + 200;
+		popup->hash = UI_hash_djb2(ctx, "popup", hash);
+		popup->flags |= UI_Block_Flags_hit_test;
+		G->check_mouse_hashes.push_back(popup->hash);
+		UI_Block *pop_prv = UI_find_block(ctx, popup->hash, UI_PREVIOUS);
+		if (pop_prv) {
+			if (!UI_mouse_in_block_force(pop_prv) && keydn(MouseL)) {
+				clicked_outside = true;
+			}
+		}
+		UI_push_parent_defer(ctx, popup) {
+			if (UI_button(button_style_inside, "reload folder")) {
+				scan_folder(G->files[G->current_file_index].file.path);
+				metadata->open = false;
+			}
+			if (UI_button(button_style_inside, "shuffle file order")) {
+				shuffle_folder();
+				metadata->open = false;
+			}
+		}
+		popup->style.size[axis_x] = { UI_Size_t::sum_of_children, 1, 1.0f };
+		popup->style.size[axis_y] = { UI_Size_t::sum_of_children, 1, 1.f };
+		popup->style.color[c_background] = theme->bg_main_0;
+		popup->style.color[c_border] = theme->bg_sub;
+		popup->style.border_size = 1;
+		popup->style.roundness = v4(8);
+		popup->style.layout.padding = v2(10);
+		popup->style.layout.spacing = v2(7);
+		popup->style.layout.axis = axis_y;
+		popup->style.position[axis_x] = { UI_Position_t::absolute, spawn_pos.x };
+		popup->style.position[axis_y] = { UI_Position_t::absolute,  spawn_pos.y - 50.f };
+		UI_Block *ref_popup = UI_find_block(ctx, popup->hash, UI_PREVIOUS);
+		if (ref_popup) {
+			popup->style.position[axis_x].value = clamp(popup->style.position[axis_x].value, 0, WW - ref_popup->size.x - 5);
+			popup->style.position[axis_y].value = clamp(popup->style.position[axis_y].value, 0, WH - ref_popup->size.y - 35);
+			popup->flags |= UI_Block_Flags_draw_background | UI_Block_Flags_draw_border;
+		}
+
+	}
+
+	if (metadata) {
+		if (clicked_outside)	metadata->open = false;
+	}
+
+	return popup_open;
+}
+
 struct UI_Histogram_Style {
 	UI_Button_Style button_style;
 	UI_Checkbox_Style checkbox_style;

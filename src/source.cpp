@@ -477,6 +477,7 @@ static void save_settings() {
 		fwrite(&G->settings_dont_resize, sizeof(bool), 1, F);
 		fwrite(&G->settings_selected_theme, sizeof(int32_t), 1, F);
 		fwrite(&G->settings_calculate_histograms, sizeof(bool), 1, F);
+		fwrite(&G->settings_hide_status_with_gui, sizeof(bool), 1, F);
         fclose(F);
     }
 }
@@ -502,6 +503,7 @@ static void load_settings() {
 		fread(&G->settings_dont_resize, sizeof(bool), 1, F);
 		fread(&G->settings_selected_theme, sizeof(int32_t), 1, F);
 		fread(&G->settings_calculate_histograms, sizeof(bool), 1, F);
+		fread(&G->settings_hide_status_with_gui, sizeof(bool), 1, F);
         fclose(F);
     }
 }
@@ -1994,8 +1996,11 @@ static void update_gui() {
 
 	u32 base = 0;
 	bool fullscreen = is_fullscreen(hwnd);
+	bool draw_status = !fullscreen || (fullscreen && !G->settings_hide_status_fullscreen);
+	if (!G->show_gui && G->settings_hide_status_with_gui)
+		draw_status = false;
 
-	if (!fullscreen || (fullscreen && !G->settings_hide_status_fullscreen)) {
+	if (draw_status) {
 		UI_Block *status_bar = UI_push_block(ctx, 0);
 		status_bar->flags |= UI_Block_Flags_draw_background;
 		status_bar->style.size[axis_x] = { UI_Size_t::pixels, f32(WW), 1 };
@@ -2136,6 +2141,7 @@ static void update_gui() {
 	}
 
 	UI_Button_Style btn_default;
+	btn_default.dots = false;
 	btn_default.color_bg = {
 		theme->bg_main_2,
 		theme->bg_main_3,
@@ -2165,7 +2171,7 @@ static void update_gui() {
 		theme->text_reg_main,
 		theme->bg_main_2_d
 	};
-	checkbox_default.border = G->settings_selected_theme == UI_Theme_Light ? 0.5 : 2;
+	checkbox_default.border = G->settings_selected_theme == UI_Theme_Polar_White ? 0.5 : 2;
 	checkbox_default.font = G->ui_font;
 	checkbox_default.font_size = font_size_btn;
 	checkbox_default.roundness = 4;
@@ -2313,7 +2319,17 @@ static void update_gui() {
 				UI_push_parent_defer(ctx, UI_bar(axis_y))
 				{
 					UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
-					btn_default.size = v2(50, 27);
+					btn_default.size = v2(50, 19);
+					if (UI_button(&btn_default, "fit in")) {
+						G->position = v2(0, 0);
+						if (G->graphics.main_image.w > G->graphics.main_image.h)
+							G->req_truescale = (float)WW / G->graphics.main_image.w;
+						else 
+							G->req_truescale = (float)WH / G->graphics.main_image.h;
+						send_signal(G->signals.update_pass);
+						send_signal(G->signals.update_truescale);
+					}
+					UI_tooltip("Fit image within window size");
 					if (UI_button(&btn_default, "fit W")) {
 						G->position = v2(0, 0);
 						G->req_truescale = (float)WW / G->graphics.main_image.w;
@@ -2334,7 +2350,6 @@ static void update_gui() {
 						send_signal(G->signals.update_pass);
 						send_signal(G->signals.update_truescale);
 					}
-					UI_tooltip("Zoom image to 100%% scale, one image pixel matching one screen pixel");
 				}
 			}
 
@@ -2405,17 +2420,31 @@ static void update_gui() {
 
 				}
 				float file = G->current_file_index;
-				UI_set_disabled_defer(true) {
-					slider_style.string[0] = 0;
-					slider_style.col_text = {
-						theme->text_reg_main_d,
-						theme->text_reg_main_d,
-						theme->text_reg_main_d,
-						theme->text_reg_main_d
-					};
-					sprintf(slider_style.string, "file: %i \\ %i", G->current_file_index + 1, G->files.Count);
-					slider_style.bar_short_axis = slider_style.pad_min_size = 15;
-					UI_slider(&slider_style, axis_x, &file, 0, G->files.Count - 1, UI_hash_djb2(ctx, "file slider"));
+				slider_style.string[0] = 0;
+				slider_style.col_text = {
+					theme->text_reg_main_d,
+					theme->text_reg_main_d,
+					theme->text_reg_main_d,
+					theme->text_reg_main_d
+				};
+				slider_style.bar_long_axis -= 30;
+				sprintf(slider_style.string, "file: %i \\ %i", G->current_file_index + 1, G->files.Count);
+				slider_style.bar_short_axis = slider_style.pad_min_size = 15;
+				UI_push_parent_defer(ctx, UI_bar(axis_x))
+				{
+					UI_set_disabled_defer(true)
+					{
+						UI_slider(&slider_style, axis_x, &file, 0, G->files.Count - 1, UI_hash_djb2(ctx, "file slider"));
+					}
+					UI_Button_Style bs = btn_default;
+					bs.size = v2(30, 15);
+					bs.dots = true;
+					UI_Button_Style bsi = btn_default;
+					bsi.size = v2(125, 25);
+					UI_set_disabled_defer(G->files.Count == 0)
+					{
+						popup_open |= UI_files_reload_menu(&bs, &bsi, "files order");
+					}
 				}
 			}
 
@@ -2847,42 +2876,7 @@ static void update_gui() {
 				UI_combo(&default_combo_style, "reset position options",  &G->settings_resetpos, resetpos_options, array_size(resetpos_options));
 				UI_combo(&default_combo_style, "reset zoom options", &G->settings_resetzoom, resetzoom_options, array_size(resetzoom_options));
 			}
-			UI_push_parent_defer(ctx, UI_bar(axis_y)) {
-				UI_checkbox(&checkbox_default, &G->settings_autoplayGIFs, "Autoplay GIF files upon loading");
-				UI_checkbox(&checkbox_default, &G->settings_Sort, "Sort files according to folder's sorting order (otherwise it's alphabetical)");
-				UI_checkbox(&checkbox_default, &G->settings_movementinvert, "Inverted pan movement with WASD");
-				UI_checkbox(&checkbox_default, &G->settings_exif, "Parse EXIF data from JPEGs");
-				UI_tooltip("Parses image orientation, disablable for optional performance improvement");
-				UI_checkbox(&checkbox_default, &G->settings_hide_status_fullscreen, "Hide status bar in fullscreen mode");
-				UI_checkbox(&checkbox_default, &G->settings_dont_resize, "Don't resize window on image change");
-				UI_checkbox(&checkbox_default, &G->settings_calculate_histograms, "Calculate image histograms (relatively performance intensive on load)");
-			}
 			f32 line_h = 20;
-			UI_push_parent_defer(ctx, UI_bar(axis_x)) {
-				UI_push_parent_defer(ctx, UI_bar(axis_x)) {
-					UI_Block* bar = UI_get_current_parent(ctx);
-					bar->style.size[axis_x] = { UI_Size_t::percent_of_parent, 0.5, 1 };
-					bar->style.size[axis_y] = { UI_Size_t::pixels, line_h, 1 };
-					bar->style.layout.align[axis_y] = align_center;
-					bar->style.layout.spacing = v2(5);
-					UI_text(theme->text_reg_main, G->ui_font, 12, "Theme: ");
-				}
-				UI_push_parent_defer(ctx, UI_bar(axis_x)) {
-					UI_Block* bar = UI_get_current_parent(ctx);
-					bar->style.size[axis_x] = { UI_Size_t::percent_of_parent, 0.5, 1 };
-					bar->style.layout.spacing = v2(5);
-					default_combo_style.btn_size = v2(235, line_h);
-					UI_combo(&default_combo_style, "Theme selector", &G->settings_selected_theme, themes_str, array_size(themes_str));
-					//if (UI_combo(&combo_style, "Theme selector", &G->settings_selected_theme, themes_str, array_size(themes_str))) {
-					//	BOOL USE_DARK_MODE = G->settings_selected_theme != UI_Theme_Light;
-					//	BOOL SET_IMMERSIVE_DARK_MODE_SUCCESS = SUCCEEDED(DwmSetWindowAttribute(
-					//		hwnd, DWMWINDOWATTRIBUTE::DWMWA_USE_IMMERSIVE_DARK_MODE,
-					//		&USE_DARK_MODE, sizeof(USE_DARK_MODE)));
-					//	ShowWindow(hwnd, SW_HIDE);
-					//	ShowWindow(hwnd, SW_SHOW);
-					//}
-				}
-			}
 			UI_push_parent_defer(ctx, UI_bar(axis_x)) {
 				UI_push_parent_defer(ctx, UI_bar(axis_x)) {
 					UI_Block* bar = UI_get_current_parent(ctx);
@@ -2910,6 +2904,34 @@ static void update_gui() {
 						checkerboard_color_2[i] = vc2[i];
 					}
 				}
+			}
+			UI_push_parent_defer(ctx, UI_bar(axis_x)) {
+				UI_push_parent_defer(ctx, UI_bar(axis_x)) {
+					UI_Block* bar = UI_get_current_parent(ctx);
+					bar->style.size[axis_x] = { UI_Size_t::percent_of_parent, 0.5, 1 };
+					bar->style.size[axis_y] = { UI_Size_t::pixels, line_h, 1 };
+					bar->style.layout.align[axis_y] = align_center;
+					bar->style.layout.spacing = v2(5);
+					UI_text(theme->text_reg_main, G->ui_font, 12, "Theme: ");
+				}
+				UI_push_parent_defer(ctx, UI_bar(axis_x)) {
+					UI_Block* bar = UI_get_current_parent(ctx);
+					bar->style.size[axis_x] = { UI_Size_t::percent_of_parent, 0.5, 1 };
+					bar->style.layout.spacing = v2(5);
+					default_combo_style.btn_size = v2(235, line_h);
+					UI_combo(&default_combo_style, "Theme selector", &G->settings_selected_theme, themes_str, array_size(themes_str));
+				}
+			}
+			UI_push_parent_defer(ctx, UI_bar(axis_y)) {
+				UI_checkbox(&checkbox_default, &G->settings_autoplayGIFs, "Autoplay GIF files upon loading");
+				UI_checkbox(&checkbox_default, &G->settings_Sort, "Sort files according to folder's sorting order (otherwise it's alphabetical)");
+				UI_checkbox(&checkbox_default, &G->settings_movementinvert, "Inverted pan movement with WASD");
+				UI_checkbox(&checkbox_default, &G->settings_exif, "Parse EXIF data from JPEGs");
+				UI_tooltip("Parses image orientation, disablable for optional performance improvement");
+				UI_checkbox(&checkbox_default, &G->settings_hide_status_fullscreen, "Hide status bar in fullscreen mode");
+				UI_checkbox(&checkbox_default, &G->settings_hide_status_with_gui, "Only show status bar on hover");
+				UI_checkbox(&checkbox_default, &G->settings_dont_resize, "Don't resize window on image change");
+				UI_checkbox(&checkbox_default, &G->settings_calculate_histograms, "Calculate image histograms (relatively performance intensive on load)");
 			}
 			UI_push_parent_defer(ctx, UI_bar(axis_x)) {
 				UI_push_parent_defer(ctx, UI_bar(axis_x)) {
@@ -2965,6 +2987,16 @@ enum Drag_index {
 
 	drag_count,
 };
+
+static void shuffle_folder() {
+
+	for (int i = G->files.Count - 1; i > 0; i--) {
+		int j = rand() % (i + 1);
+		swap(File_Data, G->files[i], G->files[j]);
+		G->current_file_index = 0;
+		G->signals.reload_file = true;
+	}
+}
 
 static void update_logic() {
 	bool WantCaptureMouse = G->ui_want_capture_mouse;

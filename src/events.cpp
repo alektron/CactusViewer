@@ -62,6 +62,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
     case WM_LBUTTONUP:   { K->K[MouseL].up = true; K->K[MouseL].on = false; break; }
     case WM_RBUTTONUP:   { K->K[MouseR].up = true; K->K[MouseR].on = false; break; }                                                                  
     case WM_MBUTTONUP:   { K->K[MouseM].up = true; K->K[MouseM].on = false; break; }   
+	case WM_XBUTTONUP:
+	case WM_XBUTTONDOWN:
+	{
+        int i = 0;
+		WORD x_button = GET_XBUTTON_WPARAM(wParam);
+		if(x_button == XBUTTON1)
+		{
+			i = MouseBk;
+		}
+		else if(x_button == XBUTTON2)
+		{
+			i = MouseFr;
+		}
+
+		if (message == WM_XBUTTONDOWN) { K->K[i].dn = true; K->K[i].on = true; }
+        else { K->K[i].up = true; K->K[i].on = false;}
+        break;
+	}
     case WM_LBUTTONDBLCLK : { K->double_click = true; break; }   
     case WM_KEYUP:
     case WM_KEYDOWN: {

@@ -57,7 +57,7 @@ int wmain(int argc, wchar_t **argv) {
         render();
 
         if (G->files.Count > 0) {
-            if ((!G->sorting && keyup(Key_Right)) || G->signals.next_image) {
+            if ((!G->sorting && (keyup(Key_Right) || keyup(MouseFr))) || G->signals.next_image) {
                 G->signals.next_image = false;
 
                 if (G->current_file_index < G->files.Count - 1) {
@@ -67,7 +67,7 @@ int wmain(int argc, wchar_t **argv) {
                     CreateThread(NULL, 0, loader_thread, (LPVOID)&inputs, 0, NULL);
                 }
             }
-            if ((!G->sorting && keyup(Key_Left))|| G->signals.prev_image) {
+            if ((!G->sorting && (keyup(Key_Left) || keyup(MouseBk)))|| G->signals.prev_image) {
                 G->signals.prev_image = false;
 
                 if (G->current_file_index > 0) {
@@ -77,6 +77,11 @@ int wmain(int argc, wchar_t **argv) {
                     CreateThread(NULL, 0, loader_thread, (LPVOID)&inputs, 0, NULL);
                 }
             }
+			if (G->signals.reload_file) {
+				G->signals.reload_file = false;
+				inputs = {G->files[G->current_file_index].file.path, G->current_file_index, &G->files[G->current_file_index], false};
+				CreateThread(NULL, 0, loader_thread, (LPVOID)&inputs, 0, NULL);
+			}
         }
         reset_inputs();
 		if (keyup(MouseL))

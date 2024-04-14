@@ -88,6 +88,8 @@ enum Key_ID
     MouseM,
     MouseX1,
     MouseX2,
+    MouseFr,
+    MouseBk,
     Key_Shift,
     Key_LShift,
     Key_RShift,
@@ -357,6 +359,7 @@ struct Signals
     bool update_orientation_step_2 = false;
     bool update_blending = false;
     bool next_image = false;
+    bool reload_file = false;
     bool prev_image = false;
     bool update_truescale = false;
     bool setting_applied = false;
@@ -394,11 +397,14 @@ enum Cursor_Type {
 
 enum UI_Theme_Type {
 	UI_Theme_Cactus_Green,
-	UI_Theme_Dark_Blue,
-	UI_Theme_Light,
+	UI_Theme_Cyber_Blue,
+	UI_Theme_Dark_Purple,
+	UI_Theme_Crimson_Black,
+	UI_Theme_Polar_White,
 
 	UI_Theme_Count,
 };
+char *themes_str[] {"Cactus Green", "Cyber Blue", "Dark Purple", "Crimson Black", "Ice White"};
 
 struct UI_Theme {
 	UI_Color4 bg_main_0;
@@ -518,6 +524,7 @@ struct Global
     bool settings_Sort = true;
     bool settings_exif = true;
     bool settings_hide_status_fullscreen = false;
+    bool settings_hide_status_with_gui = false;
     bool settings_dont_resize = false;
     bool settings_calculate_histograms = false;
 	int32_t settings_selected_theme = UI_Theme_Cactus_Green;
