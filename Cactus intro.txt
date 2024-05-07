@@ -2,6 +2,13 @@ Cactus Image Viewer is a single file lightweight versitile image viewer for Wind
 
 This installer allows you to set Cactus as the dafault viewer and adds it to right click context menus.
 
+Patch notes:
+- Config file is now in JSON format, this allows to edit settings in the file directly and helps making setting changes backward compatible in the future.
+- Added a setting for selecting how an image is zoomed when first open and the settings to "save zoom for each image" is selected, you can now have it either fill the window or zoom to 1:1.
+- Added a feature where you can choose the format of the color you copy using the color picker, including Hex, RGB and HSVm with different parenthesis styles. Introduced by @Orcenhaze.
+- Fixed commandline loading issues in by @Orcenhaze in.
+- Fixed the issue of the status bar being 1 pixel too small on the edges which allowed to see the image in the back at the bottom too.
+
 Features:
 - Standalone executable.
 - Crisp font rendering with subpixel antialiasing.
