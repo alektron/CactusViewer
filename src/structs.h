@@ -545,7 +545,7 @@ struct Global
     float settings_shiftslowmag;
     bool settings_movementinvert;
     bool settings_autoplayGIFs;
-    bool settings_Sort = true;
+    bool settings_sort = true;
     bool settings_exif = true;
     bool settings_hide_status_fullscreen = false;
     bool settings_hide_status_with_gui = false;

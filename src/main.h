@@ -35,6 +35,9 @@
 #include <ShellScalingAPI.h>
 #pragma comment(lib, "Shcore.lib")
 
+#include "cJSON.h"
+#include "cJSON.c"
+
 #define _MAX_FPS 250;
 
 #define VERSION_N "2.1.4"

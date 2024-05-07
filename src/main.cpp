@@ -21,7 +21,6 @@ int wmain(int argc, wchar_t **argv) {
     memmove(EXE_FOLDER, exe_path, (one_past_slash - 1 - exe_path) * sizeof(wchar_t));
     
     // This tells us where user executed CactusViewer.exe from.
-    wchar_t working_directory[256];
     GetCurrentDirectoryW(sizeof(CURRENT_FOLDER), CURRENT_FOLDER);
 #else
     APPDATA_FOLDER = "./";
