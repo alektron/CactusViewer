@@ -535,6 +535,31 @@ static void center_window() {
     SetWindowPos(hwnd, NULL, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
+bool get_font_file_from_system(char* output, int output_size, char* font)
+{
+	HKEY hkey;
+	CHAR value[2048];
+	DWORD value_length = sizeof(value);
+	const CHAR* sub_key = "Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
+	CHAR windows_dir[MAX_PATH];
+	bool windows_path_found = false;
+	bool result = false;
+
+	if (GetWindowsDirectoryA(windows_dir, MAX_PATH))
+		windows_path_found = true;
+
+	if (windows_path_found && RegOpenKeyExA(HKEY_LOCAL_MACHINE, sub_key, 0, KEY_READ, &hkey) == ERROR_SUCCESS) 
+	{
+		if (RegQueryValueExA(hkey, font, NULL, NULL, (LPBYTE)value, &value_length) == ERROR_SUCCESS)
+		{
+			snprintf(output, output_size, "%s\\Fonts\\%.*s", windows_dir, value_length, value);
+			result = true;
+		} 
+		RegCloseKey(hkey);
+	}
+	return result;
+}
+
 static void init_all() {
     WW  = 700;
     WH = 700;
@@ -646,20 +671,27 @@ static void init_all() {
 	UI_d3d11_init(G->ui, G->graphics.device, G->graphics.device_ctx);
 	UI_init_platform_win32(G->ui);
 
-	int sizes[] = { 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20 };
+	int sizes[] = { 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 20 };
 	int ascii_start = 32;
 	int ascii_end = 126;
 
-#if	DEBUG_MODE
-	G->ui_font = UI_load_font_file(G->ui, "../src/FiraSans-Regular.ttf", 
-	                                 ascii_start, ascii_end, sizes, array_size(sizes));
-#else
-	u8 font_file[] = {
-		#include "FiraSans-Regular.ttf.cpp"
-	};
-	G->ui_font = UI_load_font_memory(G->ui, font_file, array_size(font_file), 
-	                                 ascii_start, ascii_end, sizes, array_size(sizes));
-#endif
+//#if	DEBUG_MODE
+//	G->ui_font = UI_load_font_file(G->ui, "../src/FiraSans-Regular.ttf", 
+//	                                 ascii_start, ascii_end, sizes, array_size(sizes));
+//#else
+//	u8 font_file[] = {
+//		#include "FiraSans-Regular.ttf.cpp"
+//	};
+//	G->ui_font = UI_load_font_memory(G->ui, font_file, array_size(font_file), 
+//	                                 ascii_start, ascii_end, sizes, array_size(sizes));
+//	#endif
+
+	// just getting the font from the system now:
+	char system_font[512] = {};
+	if (!get_font_file_from_system(system_font, 512, "Segoe UI (TrueType)"))
+		get_font_file_from_system(system_font, 512, "Arial (TrueType)");
+	G->ui_font = UI_load_font_file(G->ui, system_font, 
+								   ascii_start, ascii_end, sizes, array_size(sizes));
 
 //	G->shapes_texture_id = UI_create_texture(G->ui, 
 //	                                         (u8*)UI_asset_shape_arrow,
