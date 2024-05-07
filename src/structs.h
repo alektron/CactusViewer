@@ -536,6 +536,10 @@ struct Global
 
     int32_t settings_resetpos;
     int32_t settings_resetzoom;
+    int32_t settings_copy_color_format;
+    int32_t settings_copy_color_enclose_type;
+    bool settings_copy_color_include_alpha = false;
+    bool settings_copy_color_normalize_rgb = false;
     int32_t settings_newfilezoom;
     float settings_movementmag;
     float settings_shiftslowmag;
@@ -580,3 +584,4 @@ struct Global
 
 Global global = {0};
 Global *G = &global;
+uint32_t CONFIG_FILE_VERSION = 1;
