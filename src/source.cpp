@@ -485,6 +485,7 @@ static void save_settings() {
 		fwrite(&G->settings_selected_theme, sizeof(int32_t), 1, F);
 		fwrite(&G->settings_calculate_histograms, sizeof(bool), 1, F);
 		fwrite(&G->settings_hide_status_with_gui, sizeof(bool), 1, F);
+        fwrite(&G->settings_newfilezoom, sizeof(int32_t), 1, F);
         fclose(F);
     }
 }
@@ -511,6 +512,7 @@ static void load_settings() {
 		fread(&G->settings_selected_theme, sizeof(int32_t), 1, F);
 		fread(&G->settings_calculate_histograms, sizeof(bool), 1, F);
 		fread(&G->settings_hide_status_with_gui, sizeof(bool), 1, F);
+        fread(&G->settings_newfilezoom, sizeof(int32_t), 1, F);
         fclose(F);
     }
 }
@@ -747,7 +749,7 @@ static int load_image_pre(wchar_t *path, u32 id, bool dropped) {
         push_alert("Loading the file failed");
         G->files[G->current_file_index].failed = true;
         G->loaded = true;
-        send_signal(G->signals.update_pass);
+        
         //if (dropped)
         //    reset_to_no_folder();
         set_to_no_file();
@@ -867,7 +869,7 @@ static int load_image_wic_pre(wchar_t *path, u32 id, bool dropped, File_Data* fi
 		}
         G->files[G->current_file_index].failed = true;
         G->loaded = true;
-        send_signal(G->signals.update_pass);
+        
         //if (dropped)
             //reset_to_no_folder();
         set_to_no_file();
@@ -943,7 +945,7 @@ static int load_webp_pre(wchar_t *path, u32 id, bool dropped, int* type) {
 			push_alert("Loading the file failed");
 			G->files[G->current_file_index].failed = true;
 			G->loaded = true;
-			send_signal(G->signals.update_pass);
+			
 			//if (dropped)
 				//reset_to_no_folder();
 			set_to_no_file();
@@ -1104,6 +1106,20 @@ static void get_window_size() {
     WH = rect.bottom - rect.top;
 }
 
+static void apply_scale(float true_scale)
+{
+	float TS = true_scale;
+	TS = clamp(TS, 0.1, 500.f);
+
+	if (G->graphics.aspect_img < G->graphics.aspect_wnd)
+		G->scale = TS * (float)G->graphics.main_image.h / WH;
+	else
+		G->scale = TS * (float)G->graphics.main_image.w / WW;
+
+	//if (!G->signals.setting_applied) G->position *= G->scale / prev_scale;
+	send_signal(G->signals.update_truescale);
+}
+
 static void refresh_display() {
 	if (is_fullscreen(hwnd) || G->settings_dont_resize) return;
     v2 display_size = v2(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
@@ -1120,34 +1136,55 @@ static void refresh_display() {
 
     get_window_size();
 }
+
+static void fit_image_in()
+{
+	G->position = v2(0, 0);
+	if (G->graphics.main_image.w > G->graphics.main_image.h)
+		G->req_truescale = (float)WW / G->graphics.main_image.w;
+	else 
+		G->req_truescale = (float)WH / G->graphics.main_image.h;
+	G->files[G->current_file_index].scaled = true;
+}
+static void fit_image_w()
+{
+	G->position = v2(0, 0);
+	G->req_truescale = (float)WW / G->graphics.main_image.w;
+	G->files[G->current_file_index].scaled = true;
+}
+static void fit_image_h()
+{
+	G->position = v2(0, 0);
+	G->req_truescale = (float)WH / G->graphics.main_image.h;
+	G->files[G->current_file_index].scaled = true;
+}
+static void fit_image_1()
+{
+	G->position = v2(0, 0);
+	G->req_truescale = 1;
+	G->files[G->current_file_index].scaled = true;
+}
+
 static void apply_settings() {
+	bool dont_apply_scale = false;
     switch (G->settings_resetzoom) {
-    case 0: // Do not reset zoom
-        break;
+    case 0: dont_apply_scale = true; break;
     case 1: // Save zoom for each file
-        G->req_truescale = G->files[G->current_file_index].scale;
-        send_signal(G->signals.update_truescale);
+		if (G->files[G->current_file_index].scaled)
+        	G->req_truescale = G->files[G->current_file_index].scale;
+		else // use new file setting
+		{
+			switch (G->settings_newfilezoom)
+			{
+			case 0: fit_image_in(); break;
+			case 1: fit_image_1(); break;
+			}
+		}
         break;
-    case 2: // Fit Width
-        G->position = v2(0, 0);
-        G->req_truescale = (float)WW / G->graphics.main_image.w;
-        send_signal(G->signals.update_pass);
-        send_signal(G->signals.update_truescale);
-        break;
-    case 3: // Fit Height
-        G->position = v2(0, 0);
-        G->req_truescale = (float)WH / G->graphics.main_image.h;
-        send_signal(G->signals.update_pass);
-        send_signal(G->signals.update_truescale);
-        break;
-    case 4: // Zoom to 1:1
-        G->position = v2(0, 0);
-        G->req_truescale = 1;
-        send_signal(G->signals.update_pass);
-        send_signal(G->signals.update_truescale);
-        break;
-    default:
-        break;
+    case 2: fit_image_w(); break;
+    case 3: fit_image_h(); break;
+    case 4: fit_image_1();break;
+    default: break;
     }
     switch (G->settings_resetpos) {
     case 0: // Persistent position across all files
@@ -1161,7 +1198,8 @@ static void apply_settings() {
     default:
         break;
     }
-    send_signal(G->signals.setting_applied);
+	if (!dont_apply_scale)
+		apply_scale(G->req_truescale);
 }
 #include <d3d11.h>
 static void load_image_post() {
@@ -1797,30 +1835,19 @@ static HRESULT save_image(Encoder_Format encoder_format, wchar_t* path, bool cli
 	UINT height = new_size.y;
 	UINT stride = mapped_resource.RowPitch;
 	UINT buffer_size = stride * height;
-	if (SUCCEEDED(hr))
-		hr = G->wic_factory->CreateStream(&stream);
-	if (SUCCEEDED(hr))
-		hr = stream->InitializeFromFilename(path, GENERIC_WRITE);
-	if (SUCCEEDED(hr))
-		hr = G->wic_factory->CreateEncoder(get_GUID(encoder_format), nullptr, &encoder);
-	if (SUCCEEDED(hr))
-		hr = encoder->Initialize(stream, WICBitmapEncoderNoCache);
-	if (SUCCEEDED(hr))
-		hr = encoder->CreateNewFrame(&frame, &property_bag);
-	if (SUCCEEDED(hr))
-		hr = frame->Initialize(property_bag);  // No encoder parameters
-	if (SUCCEEDED(hr))
-		hr = frame->SetSize(width, height);
-	if (SUCCEEDED(hr))
-		hr = frame->SetPixelFormat(&pixel_format);
+	if (SUCCEEDED(hr))	hr = G->wic_factory->CreateStream(&stream);
+	if (SUCCEEDED(hr))	hr = stream->InitializeFromFilename(path, GENERIC_WRITE);
+	if (SUCCEEDED(hr))	hr = G->wic_factory->CreateEncoder(get_GUID(encoder_format), nullptr, &encoder);
+	if (SUCCEEDED(hr))	hr = encoder->Initialize(stream, WICBitmapEncoderNoCache);
+	if (SUCCEEDED(hr))	hr = encoder->CreateNewFrame(&frame, &property_bag);
+	if (SUCCEEDED(hr))	hr = frame->Initialize(property_bag);  // No encoder parameters
+	if (SUCCEEDED(hr))	hr = frame->SetSize(width, height);
+	if (SUCCEEDED(hr))	hr = frame->SetPixelFormat(&pixel_format);
 	//	if (SUCCEEDED(hr)) // We're expecting to write out 32bppBGRA. Fail if the encoder cannot do it.
 	//		hr = IsEqualGUID(req_pixel_format, pixel_format) ? S_OK : E_FAIL;
-	if (SUCCEEDED(hr)) 
-		hr = frame->WritePixels(height, stride, buffer_size, data);
-	if (SUCCEEDED(hr)) 
-		hr = frame->Commit();
-	if (SUCCEEDED(hr)) 
-		hr = encoder->Commit();
+	if (SUCCEEDED(hr)) 	hr = frame->WritePixels(height, stride, buffer_size, data);
+	if (SUCCEEDED(hr)) 	hr = frame->Commit();
+	if (SUCCEEDED(hr)) 	hr = encoder->Commit();
 	if (SUCCEEDED(hr)) {
 		printf("saved!\n");
 	} else {
@@ -2380,32 +2407,22 @@ static void update_gui() {
 					btn_default.size = v2(50, 19);
 					if (UI_button(&btn_default, "fit in")) {
 						G->position = v2(0, 0);
-						if (G->graphics.main_image.w > G->graphics.main_image.h)
-							G->req_truescale = (float)WW / G->graphics.main_image.w;
-						else 
-							G->req_truescale = (float)WH / G->graphics.main_image.h;
-						send_signal(G->signals.update_pass);
+						fit_image_in();
 						send_signal(G->signals.update_truescale);
 					}
 					UI_tooltip("Fit image within window size");
 					if (UI_button(&btn_default, "fit W")) {
-						G->position = v2(0, 0);
-						G->req_truescale = (float)WW / G->graphics.main_image.w;
-						send_signal(G->signals.update_pass);
+						fit_image_w();
 						send_signal(G->signals.update_truescale);
 					}
 					UI_tooltip("Zoom image to fit its width to the window width");
 					if (UI_button(&btn_default, "fit H")) {
-						G->position = v2(0, 0);
-						G->req_truescale = (float)WH / G->graphics.main_image.h;
-						send_signal(G->signals.update_pass);
+						fit_image_h();
 						send_signal(G->signals.update_truescale);
 					}
 					UI_tooltip("Zoom image to fit its height to the window height");
 					if (UI_button(&btn_default, "1:1")) {
-						G->position = v2(0, 0);
-						G->req_truescale = 1;
-						send_signal(G->signals.update_pass);
+						fit_image_1();
 						send_signal(G->signals.update_truescale);
 					}
 				}
@@ -2859,6 +2876,7 @@ static void update_gui() {
 
 			char *resetzoom_options[]  {"Do not reset zoom", "Save zoom for each file", "Fit Width", "Fit Height", "Zoom to 1:1"};
 			char *resetpos_options[] { "Do not reset position", "Save position for each file", "Reset to center" };
+			char *new_file_zoom_options[] { "Fill window", "zoom to 1:1" };
 			UI_text(theme->text_reg_main, G->ui_font, 12,"Persistent zoom and position settings upon file change: ");
 			UI_push_parent_defer(ctx, UI_bar(axis_x)) {
 				UI_Block* bar = UI_get_current_parent(ctx);
@@ -2866,6 +2884,21 @@ static void update_gui() {
 				bar->style.layout.align[axis_x] = align_center;
 				UI_combo(&default_combo_style, "reset position options",  &G->settings_resetpos, resetpos_options, array_size(resetpos_options));
 				UI_combo(&default_combo_style, "reset zoom options", &G->settings_resetzoom, resetzoom_options, array_size(resetzoom_options));
+			}
+			UI_push_parent_defer(ctx, UI_bar(axis_x)) {
+				UI_Block* bar = UI_get_current_parent(ctx);
+				bar->style.size[axis_x].type = UI_Size_t::pixels;
+				bar->style.size[axis_x].value = 482;
+				bar->style.layout.align[axis_y] = align_center;
+				UI_text(theme->text_reg_main, G->ui_font, 12,"Upon opening a new file: ");
+				UI_push_parent_defer(ctx, UI_bar(axis_x)) {
+					bar = UI_get_current_parent(ctx);
+					bar->style.size[axis_x].type = UI_Size_t::percent_of_parent;
+					bar->style.size[axis_x].value = 1;
+					bar->style.size[axis_x].strictness = 0;
+					bar->style.layout.align[axis_x] = align_end;
+					UI_combo(&default_combo_style, "new file zoom options", &G->settings_newfilezoom, new_file_zoom_options, array_size(new_file_zoom_options));
+				}
 			}
 			f32 line_h = 20;
 			UI_push_parent_defer(ctx, UI_bar(axis_x)) {
@@ -3179,6 +3212,8 @@ static void update_logic() {
             G->files[G->current_file_index].pos = G->position;
             G->files[G->current_file_index].scale = G->truescale;
         }
+		if (G->keys.scroll_y_diff > 0)
+			G->files[G->current_file_index].scaled = true;
     }
     
     if (G->graphics.main_image.w > 0) {
@@ -3308,7 +3343,7 @@ static void render() {
 				}
 			}
 			reset_image_edit();
-			send_signal(G->signals.update_pass);
+			
 			G->loaded = true;
 			if (G->loading_dropped_file) {
 				G->loading_dropped_file = false;

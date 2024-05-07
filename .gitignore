@@ -3,3 +3,4 @@
 *.db
 .vs/*
 bin/*
+br.bat

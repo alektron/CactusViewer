@@ -369,7 +369,6 @@ struct Alert
 
 struct Signals
 {
-    bool update_pass = false;
     bool init_step_2 = false;
     bool update_orientation_step_2 = false;
     bool update_blending = false;
@@ -396,6 +395,7 @@ struct File_Data
     bool failed = false;
     v2 pos = v2();
     float scale = 0;
+	bool scaled = false;
     int index;
 };
 
@@ -536,6 +536,7 @@ struct Global
 
     int32_t settings_resetpos;
     int32_t settings_resetzoom;
+    int32_t settings_newfilezoom;
     float settings_movementmag;
     float settings_shiftslowmag;
     bool settings_movementinvert;

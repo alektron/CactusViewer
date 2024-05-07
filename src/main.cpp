@@ -53,8 +53,6 @@ int wmain(int argc, wchar_t **argv) {
 
         get_window_size();
 
-        if (G->signals.update_pass)
-            G->signals.update_pass = false;
         update_gui();
 		update_logic();
         render();
