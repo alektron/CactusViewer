@@ -1,8 +1,8 @@
 ![logo-export](https://user-images.githubusercontent.com/75145262/200181192-35c8ea4d-e864-4ac7-89d0-8deda4901699.png)
 # Cactus Image Viewer
 #### by Wassim Alhajomar (@wassimulator)
-A single-file handmade image viewer for Windows, written in C/C++.       
-### VIDEO: Watch it in action: 
+A single-file handmade image viewer for Windows, written in C/C++.
+### VIDEO: Watch it in action
 Featured on the Handmade Network's Wheel Reinvention Jam.
 
 [![Video](https://img.youtube.com/vi/FofjjYWCeX8/maxresdefault.jpg)](https://youtu.be/FofjjYWCeX8)
@@ -11,17 +11,17 @@ Featured on the Handmade Network's Wheel Reinvention Jam.
 -----
 
 [Consider donating if you like this project](https://www.paypal.com/donate/?hosted_button_id=NYKGNB8VZG84Y)
-#### Used libraries:
-Homemade immediate mode UI, a custom D3D11 renderer, [Windows Imaging Component](https://learn.microsoft.com/en-us/windows/win32/wic/-wic-about-windows-imaging-codec), [stb_image](https://github.com/nothings/stb) and [libwebp](https://chromium.googlesource.com/webm/libwebp) for decoding, [cute_files.h](https://github.com/RandyGaul/cute_headers/blob/master/cute_files.h) to manage directories on different platforms, [FreeType](https://freetype.org/) for font loading, and [easyexif](https://github.com/mayanklahiri/easyexif) for fetching image metadata.             
-#### Supported codecs: 
-**BMP, GIF, ICO, JPEG, JPEG XR, PNG, TIFF, DDS, WEBP**.         
-It also supports installed codecs for WIC, check Microsoft Store to get codecs like HEIF, RAW, or AVIF. Here:     
-[AV1 Video Extension](https://www.microsoft.com/store/productid/9MVZQVXJBQ9V?ocid=pdpshare)      
-[HEVC Video Extensions](https://www.microsoft.com/store/productid/9NMZLZ57R3T7?ocid=pdpshare)      
-[HEIF Image Extensions](https://www.microsoft.com/store/productid/9PMMSR1CGPWG?ocid=pdpshare)       
-[Raw Image Extension](https://www.microsoft.com/store/productid/9NCTDW2W1BH8?ocid=pdpshare)      
+#### Used libraries
+Homemade immediate mode UI, a custom D3D11 renderer, [Windows Imaging Component](https://learn.microsoft.com/en-us/windows/win32/wic/-wic-about-windows-imaging-codec), [stb_image](https://github.com/nothings/stb) and [libwebp](https://chromium.googlesource.com/webm/libwebp) for decoding, [cute_files.h](https://github.com/RandyGaul/cute_headers/blob/master/cute_files.h) to manage directories on different platforms, [FreeType](https://freetype.org/) for font loading, and [easyexif](https://github.com/mayanklahiri/easyexif) for fetching image metadata.
+#### Supported codecs
+**BMP, GIF, ICO, JPEG, JPEG XR, PNG, TIFF, DDS, WEBP**.
+It also supports installed codecs for WIC, check Microsoft Store to get codecs like HEIF, RAW, or AVIF. Here:
+[AV1 Video Extension](https://www.microsoft.com/store/productid/9MVZQVXJBQ9V?ocid=pdpshare)
+[HEVC Video Extensions](https://www.microsoft.com/store/productid/9NMZLZ57R3T7?ocid=pdpshare)
+[HEIF Image Extensions](https://www.microsoft.com/store/productid/9PMMSR1CGPWG?ocid=pdpshare)
+[Raw Image Extension](https://www.microsoft.com/store/productid/9NCTDW2W1BH8?ocid=pdpshare)
 
-## Features:
+## Features
 - Standalone executable.
 - Crisp font rendering with subpixel antialiasing.
 - Scans folder of opened image and allows flipping through supported images within folder, and rotating the view without changing the source files.
@@ -47,27 +47,50 @@ It also supports installed codecs for WIC, check Microsoft Store to get codecs l
 - Keyboard controls to pan, zoom, and flip through files and GIF controls.
 - Customizable settings to save each image's zoom and pan locations within a session, or to reset image zoom and pan upon file change.
 
-## Usage:
+## Installation
+
+### [Option 1] Standalone EXE from GitHub releases
+
+Download and run the latest standalone `CactusViewer.exe` file from [releases](https://github.com/Wassimulator/CactusViewer/releases).
+
+### [Option 2] Installer from GitHub releases
+
+Download and run the latest `CactusViewer_Setup.exe` from [releases](https://github.com/Wassimulator/CactusViewer/releases).
+
+### [Option 3] Using Scoop
+
+This will install the standalone `CactusViewer.exe` using [Scoop](https://scoop.sh/), which will also add a shortcut to the start menu and add `CactusViewer.exe` to the PATH environment variable.
+
+1. Install Scoop if you don't already have it.
+   - Instructions: <https://scoop.sh/>
+2. Add the Scoop Extras bucket if you don't already have it.
+   - `scoop bucket add extras`
+3. Install CactusViewer with Scoop.
+   - `scoop install extras/cactusviewer`
+
+CactusViewer can later be updated with `scoop upgrade cactusviewer` or `scoop upgrade --all` (updates all apps installed with Scoop).
+
+## Usage
 - Opening a file:
   - Drag and drop image file into the viewer, if the file is supported it should load the file and read the folder contents of the file's directory.
   - CactusViewer also supports "Open With..." by choosing it as the program to open an image with.
   - You can also use the command line to open a file by typing: `> CactusViewer.exe "path_to_file"` (make sure you write the full path of the file!).
-- Move the mouse to the bottom of the screen to view controls, click on "config" to see controls and change settings. 
+- Move the mouse to the bottom of the screen to view controls, click on "config" to see controls and change settings.
 
-## Building:
-### Windows:
-All dependencies are within the repo for your, my, and everyone's convenience. 
+## Building
+### Windows
+All dependencies are within the repo for your, my, and everyone's convenience.
 Using an MSVC 64 bit developer terminal:
 - run `b.bat` to build the project in debug mode, output in `\bin`
   (the debug version expects the font file in src, so terminal calls need to have bin as the working directory to run
    also make sure you have D3D11 debug layers from [here](https://learn.microsoft.com/en-us/windows/uwp/gaming/use-the-directx-runtime-and-visual-studio-graphics-diagnostic-features) installed or remove that flag in `init_d3d11()` when building in debug mode).
 - run `b.bat release` to build the project in release mode, output in `\bin`
 
-## Remarks:
+## Remarks
 - Update 2.0 ditches ImGui and OpenGL, the executable runs now on D3D11 with a handmade immediate mode UI library. If you have Windows, it should work, so please report any bugs!
 - For the sake of everyone's sanity, this repo has prebuilt binaries of all the above for Windows x64, I will provide other builds if I make any.
 
-## Possible improvements:
+## Possible improvements
 Possible things to expand on:
 - Unlock the supported image resolutions sizes beyond maximum GPU texture sizes, to support images larger than 60MP or 268MP respectively.
 - Decode images at lower resolutions at first and only decode full image upon zooming, to improve display speed of large files.
