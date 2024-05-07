@@ -7,15 +7,16 @@ OutputBaseFilename=CactusViewer_Setup
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequiredOverridesAllowed=dialog
-InfoBeforeFile=C:\Users\User\Documents\Cactus intro.txt
-InfoAfterFile=C:\Users\User\Documents\Cactus outro.txt
+InfoBeforeFile=Cactus intro.txt
+InfoAfterFile=Cactus outro.txt
 AppPublisherURL=https://wassimulator.com
 WizardStyle=modern
 DisableProgramGroupPage=no
 DisableDirPage=no
+OutputDir=bin
 
 [Files]
-Source: "D:\Code_Work\CactusViewer\bin\CactusViewer.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "bin\CactusViewer.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\CactusViewer"; Filename: "{app}\CactusViewer.exe"
