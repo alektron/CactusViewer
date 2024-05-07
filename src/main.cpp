@@ -9,8 +9,23 @@ int wmain(int argc, wchar_t **argv) {
     APPDATA_FOLDER = (char *)malloc(strlen(appdata) + 15);
     sprintf(APPDATA_FOLDER, "%s\\CactusViewer", appdata);
     CreateDirectoryA(APPDATA_FOLDER, NULL);
+    
+    // Store exe parent folder.
+    wchar_t exe_path[256];
+    GetModuleFileNameW(0, exe_path, sizeof(exe_path));
+    wchar_t *one_past_slash = exe_path;
+    wchar_t *exe            = exe_path;
+    while (*exe)  {
+        if (*exe++ == L'\\') one_past_slash = exe;
+    }
+    memmove(EXE_FOLDER, exe_path, (one_past_slash - 1 - exe_path) * sizeof(wchar_t));
+    
+    // This tells us where user executed CactusViewer.exe from.
+    wchar_t working_directory[256];
+    GetCurrentDirectoryW(sizeof(CURRENT_FOLDER), CURRENT_FOLDER);
 #else
     APPDATA_FOLDER = "./";
+    // TODO(): Store exe folder and current working directory for other platforms.
 #endif
 	Loader_Thread_Inputs inputs;
 

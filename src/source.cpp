@@ -467,8 +467,13 @@ static void save_settings() {
     snprintf(buffer, sizeof(buffer), "%s\\config", APPDATA_FOLDER);
     FILE *F = fopen(buffer, "wb");
     if (F) {
+        fwrite(&CONFIG_FILE_VERSION, sizeof(uint32_t), 1, F);
         fwrite(&G->settings_resetpos, sizeof(int32_t), 1, F);
         fwrite(&G->settings_resetzoom, sizeof(int32_t), 1, F);
+        fwrite(&G->settings_copy_color_format, sizeof(int32_t), 1, F);
+        fwrite(&G->settings_copy_color_enclose_type, sizeof(int32_t), 1, F);
+        fwrite(&G->settings_copy_color_include_alpha, sizeof(bool), 1, F);
+        fwrite(&G->settings_copy_color_normalize_rgb, sizeof(bool), 1, F);
         fwrite(&checkerboard_color_1, sizeof(float), 3, F);
         fwrite(&checkerboard_color_2, sizeof(float), 3, F);
         fwrite(&bg_color, sizeof(float), 4, F);
@@ -494,8 +499,15 @@ static void load_settings() {
     snprintf(buffer, sizeof(buffer), "%s\\config", APPDATA_FOLDER);
     FILE *F = fopen(buffer, "rb");
     if (F) {
+        uint32_t version;
+        fread(&version, sizeof(uint32_t), 1, F);
+        if (version != CONFIG_FILE_VERSION) return;
         fread(&G->settings_resetpos, sizeof(int32_t), 1, F);
         fread(&G->settings_resetzoom, sizeof(int32_t), 1, F);
+        fread(&G->settings_copy_color_format, sizeof(int32_t), 1, F);
+        fread(&G->settings_copy_color_enclose_type, sizeof(int32_t), 1, F);
+        fread(&G->settings_copy_color_include_alpha, sizeof(bool), 1, F);
+        fread(&G->settings_copy_color_normalize_rgb, sizeof(bool), 1, F);
         fread(&checkerboard_color_1, sizeof(float), 3, F);
         fread(&checkerboard_color_2, sizeof(float), 3, F);
         fread(&bg_color, sizeof(float), 4, F);
@@ -1597,6 +1609,7 @@ static int scan_folder(wchar_t *path) {
     int len = wcslen(path);
     wchar_t *BasePath = nullptr;
     wchar_t *FileName = nullptr;
+    wchar_t *FullPath = nullptr;
     int newlen = len;
 
 	if (PathIsDirectoryW(path))  {
@@ -1623,6 +1636,24 @@ static int scan_folder(wchar_t *path) {
 		memcpy(BasePath, path, newlen * sizeof(wchar_t));
 		BasePath[newlen] = '\0';
 		FileName[len - newlen] = '\0';
+        
+        if (BasePath[0] && !FileName[0]) {
+            // When user executes program with something like: "C:\path\CactusViewer.exe" SomeImage.png
+            // FileName will be empty and BasePath will be the image name... swap and set BasePath to current working directory.
+            free(FileName);
+            FileName = BasePath;
+            BasePath = (wchar_t *)malloc((wcslen(CURRENT_FOLDER) + 2) * sizeof(wchar_t));
+            swprintf(BasePath, L"%ls%lc%lc%", CURRENT_FOLDER, L'\\', L'\0');
+        } else if (PathFileExistsW(BasePath) && PathIsRelativeW(BasePath)) {
+            // If BasePath is relative, append it to current working directory.
+            wchar_t *Tmp = BasePath;
+            BasePath = (wchar_t *)malloc((wcslen(Tmp) + wcslen(CURRENT_FOLDER) + 2) * sizeof(wchar_t));
+            swprintf(BasePath, L"%ls\\%ls%lc%lc%", CURRENT_FOLDER, Tmp, L'\\', L'\0');
+            free(Tmp);
+        }
+		
+        FullPath = (wchar_t *)malloc((wcslen(BasePath) + wcslen(FileName) + 1) * sizeof(wchar_t));
+        swprintf(FullPath, L"%ls%ls%lc", BasePath, FileName, L'\0');
 	}
     if (!is_valid_windows_path(BasePath))  {
         G->files.reset_count();
@@ -1674,8 +1705,8 @@ static int scan_folder(wchar_t *path) {
     if (!G->sorting && G->settings_Sort) {   
         sort_data.FileName = (wchar_t*)malloc((wcslen(FileName) + 1) * sizeof(wchar_t));
         memcpy(sort_data.FileName, FileName,  (wcslen(FileName) + 1) * sizeof(wchar_t));
-        sort_data.path =     (wchar_t*)malloc((wcslen(path) + 1)     * sizeof(wchar_t));
-        memcpy(sort_data.path, path,          (wcslen(path) + 1)     * sizeof(wchar_t));
+        sort_data.path =     (wchar_t*)malloc((wcslen(FullPath) + 1) * sizeof(wchar_t));
+        memcpy(sort_data.path, FullPath,      (wcslen(FullPath) + 1) * sizeof(wchar_t));
         //CreateThread(NULL, 0, folder_sort_thread, (LPVOID)&sort_data, 0, NULL);
 		folder_sort_thread((LPVOID)&sort_data); // seems to be performant and not need to be multithreadded
 	} else {
@@ -2010,6 +2041,8 @@ static v4 read_texture_pixel(ID3D11Texture2D* renderTargetTexture, iv2 pixel) {
 		return v4(0, 0, 0, 0);
 
 	// Copy the specific pixel from the render target to the staging texture
+	pixel.x = clamp(pixel.x, 0, WW);
+	pixel.y = clamp(pixel.y, 0, WH);
 	D3D11_BOX source_region;
 	source_region.left = pixel.x;
 	source_region.top = pixel.y;
@@ -2215,7 +2248,7 @@ static void update_gui() {
 		inspector_menu->hash = UI_hash_djb2(ctx, "inspector menu");
 		inspector_menu->style.position[axis_x] = { UI_Position_t::absolute, mouse.x };
 		inspector_menu->style.position[axis_y] = { UI_Position_t::absolute, mouse.y };
-		inspector_menu->style.size[axis_x] = { UI_Size_t::pixels, 100, 1 };
+		inspector_menu->style.size[axis_x] = { UI_Size_t::pixels, 220, 1 };
 		inspector_menu->style.size[axis_y] = { UI_Size_t::pixels, 155, 1 };
 		inspector_menu->style.color[c_background] = theme->bg_main_0;
 		inspector_menu->style.layout.spacing = v2(5, 3);
@@ -2226,7 +2259,7 @@ static void update_gui() {
 			UI_Block* color_box = UI_push_block(ctx);
 			color_box->style.color[c_background] = UI_color4_sld_v4(px);
 			color_box->flags |= UI_Block_Flags_draw_background;
-			color_box->style.size[axis_x] = { UI_Size_t::pixels, 100, 1 };
+			color_box->style.size[axis_x] = { UI_Size_t::pixels, 220, 1 };
 			color_box->style.size[axis_y] = { UI_Size_t::pixels, 50, 1 };
 			color_box->style.roundness[UI_Corner_tl] = 8;
 			color_box->style.roundness[UI_Corner_tr] = 8;
@@ -2243,13 +2276,39 @@ static void update_gui() {
 				UI_text(theme->text_reg_light, G->ui_font, 13, "G : %i", g);
 				UI_text(theme->text_reg_light, G->ui_font, 13, "B : %i", b);
 				UI_text(theme->text_reg_light, G->ui_font, 13, "A : %i", a);
-				UI_text(theme->text_info, G->ui_font, 13, "#%02X%02X%02X", r, g, b);
-				UI_text(theme->text_reg_mid, G->ui_font, 9, "Right click to copy");
-				if (keyup(MouseR)) {
-					char hexcolor[10];
-					sprintf(hexcolor, "#%02X%02X%02X", r, g, b);
-					set_clipboard_text(hexcolor);
-				}
+                char color_str[64];
+                bool copy_alpha = G->settings_copy_color_include_alpha;
+                if (G->settings_copy_color_format == 0) {
+                    // Hex
+                    if (copy_alpha) sprintf(color_str, "#%02X%02X%02X%02X", r, g, b, a);
+                    else            sprintf(color_str, "#%02X%02X%02X", r, g, b);
+                } else {
+                    int32_t t = G->settings_copy_color_enclose_type;
+                    char e0 = t == 0 ? '(' : t == 1 ? '[' : t == 2 ? '{' : ' ';
+                    char e1 = t == 0 ? ')' : t == 1 ? ']' : t == 2 ? '}' : '\0';
+                    char alpha_str[16] = "";
+                    if (G->settings_copy_color_format == 1) {
+                        // RGB
+                        if (copy_alpha) {
+                            if (G->settings_copy_color_normalize_rgb) sprintf(alpha_str, ", %.4f", px.a);
+                            else                                      sprintf(alpha_str, ", %d", a);
+                        }
+                        if (G->settings_copy_color_normalize_rgb)
+                            sprintf(color_str, "%c%.4f, %.4f, %.4f%s%c", e0, px.r, px.g, px.b, alpha_str, e1);
+                        else
+                            sprintf(color_str, "%c%d, %d, %d%s%c", e0, r, g, b, alpha_str, e1);
+                        
+                    } else if (G->settings_copy_color_format == 2) {
+                        // HSV
+                        if (copy_alpha) sprintf(alpha_str, ", %.4f", px.a);
+                        u32 rgb = UI_v4_to_u32(px);
+                        v3 hsv  = UI_rgb_to_hsv(rgb);
+                        sprintf(color_str, "%c%.4f, %.4f, %.4f%s%c", e0, hsv[0], hsv[1], hsv[2], alpha_str, e1);
+                    }
+                }
+		if (keyup(MouseR)) set_clipboard_text(color_str);
+                UI_text(theme->text_info, G->ui_font, 13, color_str);
+		UI_text(theme->text_reg_mid, G->ui_font, 9, "Right click to copy");
 			}
 		}
 
@@ -2917,20 +2976,22 @@ static void update_gui() {
 				UI_combo(&default_combo_style, "reset position options",  &G->settings_resetpos, resetpos_options, array_size(resetpos_options));
 				UI_combo(&default_combo_style, "reset zoom options", &G->settings_resetzoom, resetzoom_options, array_size(resetzoom_options));
 			}
+            char *copy_color_format_options[] {"Hex", "RGB", "HSV"};
+            char *copy_color_enclose_options[] {"(Parenthesis)", "[Brackets]", "{Braces}", "Don't enclose"};
+			UI_text(theme->text_reg_main, G->ui_font, 12,"Copied color format settings: ");
 			UI_push_parent_defer(ctx, UI_bar(axis_x)) {
 				UI_Block* bar = UI_get_current_parent(ctx);
-				bar->style.size[axis_x].type = UI_Size_t::pixels;
-				bar->style.size[axis_x].value = 482;
-				bar->style.layout.align[axis_y] = align_center;
-				UI_text(theme->text_reg_main, G->ui_font, 12,"Upon opening a new file: ");
-				UI_push_parent_defer(ctx, UI_bar(axis_x)) {
-					bar = UI_get_current_parent(ctx);
-					bar->style.size[axis_x].type = UI_Size_t::percent_of_parent;
-					bar->style.size[axis_x].value = 1;
-					bar->style.size[axis_x].strictness = 0;
-					bar->style.layout.align[axis_x] = align_end;
-					UI_combo(&default_combo_style, "new file zoom options", &G->settings_newfilezoom, new_file_zoom_options, array_size(new_file_zoom_options));
-				}
+				bar->style.layout.spacing = v2(5);
+				bar->style.layout.align[axis_x] = align_center;
+                UI_Combo_Style combo_style = default_combo_style;
+                combo_style.btn_size.x *= 0.5;
+                combo_style.item_size.x *= 0.5;
+				UI_combo(&combo_style, "copy color format options", &G->settings_copy_color_format, copy_color_format_options, array_size(copy_color_format_options));
+                UI_checkbox(&checkbox_default, &G->settings_copy_color_include_alpha, "Include alpha");
+                if (G->settings_copy_color_format != 0) // Only show if format is NOT hex
+                    UI_combo(&combo_style, "copy color enclose options", &G->settings_copy_color_enclose_type, copy_color_enclose_options, array_size(copy_color_enclose_options));
+                if (G->settings_copy_color_format == 1) // Only show if format is RGB.
+                    UI_checkbox(&checkbox_default, &G->settings_copy_color_normalize_rgb, "Normalize RGB");
 			}
 			f32 line_h = 20;
 			UI_push_parent_defer(ctx, UI_bar(axis_x)) {

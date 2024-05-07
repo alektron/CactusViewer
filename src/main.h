@@ -88,3 +88,5 @@ HGLRC hRC;
 HDC hdc;
 
 char *APPDATA_FOLDER;
+wchar_t EXE_FOLDER[256];
+wchar_t CURRENT_FOLDER[256];
