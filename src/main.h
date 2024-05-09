@@ -33,6 +33,7 @@
 #include <propidl.h>
 #include <dwmapi.h>
 #include <ShellScalingAPI.h>
+#include <shlobj.h>
 #pragma comment(lib, "Shcore.lib")
 
 #include "cJSON.h"

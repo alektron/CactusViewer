@@ -581,29 +581,29 @@ static void center_window() {
     SetWindowPos(hwnd, NULL, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-bool get_font_file_from_system(char* output, int output_size, char* font)
-{
-	HKEY hkey;
-	CHAR value[2048];
-	DWORD value_length = sizeof(value);
-	const CHAR* sub_key = "Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
-	CHAR windows_dir[MAX_PATH];
-	bool windows_path_found = false;
-	bool result = false;
+bool get_font_file_from_system(char* output, int output_size, char* font) {
+    HKEY hkey;
+    CHAR value[2048];
+    DWORD value_length = sizeof(value);
+    const CHAR* sub_key = "Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts";
+    CHAR fonts_dir[MAX_PATH];
+    bool result = false;
 
-	if (GetWindowsDirectoryA(windows_dir, MAX_PATH))
-		windows_path_found = true;
-
-	if (windows_path_found && RegOpenKeyExA(HKEY_LOCAL_MACHINE, sub_key, 0, KEY_READ, &hkey) == ERROR_SUCCESS) 
-	{
-		if (RegQueryValueExA(hkey, font, NULL, NULL, (LPBYTE)value, &value_length) == ERROR_SUCCESS)
-		{
-			snprintf(output, output_size, "%s\\Fonts\\%.*s", windows_dir, value_length, value);
-			result = true;
-		} 
-		RegCloseKey(hkey);
-	}
-	return result;
+    if (SHGetFolderPathA(NULL, CSIDL_FONTS, NULL, SHGFP_TYPE_CURRENT, fonts_dir) == S_OK) {
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, sub_key, 0, KEY_READ, &hkey) == ERROR_SUCCESS) {
+            if (RegQueryValueExA(hkey, font, NULL, NULL, (LPBYTE)value, &value_length) == ERROR_SUCCESS) {
+                if (PathIsRelativeA(value)) {
+                    snprintf(output, output_size, "%s\\%.*s", fonts_dir, value_length, value);
+                } else {
+                    strncpy(output, value, output_size);
+                }
+                output[output_size - 1] = '\0'; 
+                result = true;
+            } 
+            RegCloseKey(hkey);
+        }
+    }
+    return result;
 }
 
 static void init_all() {
