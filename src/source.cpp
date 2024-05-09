@@ -598,7 +598,9 @@ bool get_font_file_from_system(char* output, int output_size, char* font) {
                     strncpy(output, value, output_size);
                 }
                 output[output_size - 1] = '\0'; 
-                result = true;
+                if (value[0] != '\0') {
+                    result = true;
+                }
             } 
             RegCloseKey(hkey);
         }
