@@ -40,7 +40,7 @@ It also supports installed codecs for WIC, check Microsoft Store to get codecs l
 - Animated GIF and WebP support with play/pause and seek controls.
 - Quick toggle between nearest-neighbor and linear filtering for pixelart images.
 - Pixel grid.
-- 3 UI themes.
+- Multiple UI themes.
 - Customizable background color with support for checkerboard with custom colors.
 - Drag and drop support for opening image files and folders.
 - Switches to turn individual RGB channels off and switch between premultiplied alpha and straight RGB.
@@ -55,6 +55,7 @@ Download and run the latest standalone `CactusViewer.exe` file from [releases](h
 
 ### [Option 2] Installer from GitHub releases
 
+While the viewer is only one executable, the installer provides the ability to add it to desktop and start menu, add a right click context button to "Open with CactusViewer" and associates it with common image file extensions. 
 Download and run the latest `CactusViewer_Setup.exe` from [releases](https://github.com/Wassimulator/CactusViewer/releases).
 
 ### [Option 3] Using Scoop
