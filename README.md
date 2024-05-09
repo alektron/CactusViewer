@@ -95,6 +95,4 @@ Using an MSVC 64 bit developer terminal:
 Possible things to expand on:
 - Unlock the supported image resolutions sizes beyond maximum GPU texture sizes, to support images larger than 60MP or 268MP respectively.
 - Decode images at lower resolutions at first and only decode full image upon zooming, to improve display speed of large files.
-- Rectangle selection and viewing of x,y,w,h values.
-- Crop and rotate image, stb_image_write.h is already included and should be able to save the files, only the editing algorithms and UI need to be written.
 - Providing an optional software renderer backend.
