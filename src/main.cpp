@@ -32,6 +32,8 @@ int wmain(int argc, wchar_t **argv) {
 	G->message_loop_fiber = CreateFiber(0, poll_events, NULL);
 
     init_all();
+	if (G->settings_start_in_fullscreen)
+		enter_fullscreen(hwnd);
 	{
 		int scan = scan_folder(argv[1]);
 		if (argc > 1 && scan != SCAN_FAILED) {

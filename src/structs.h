@@ -549,6 +549,8 @@ struct Global
     bool settings_exif = true;
     bool settings_hide_status_fullscreen = false;
     bool settings_hide_status_with_gui = false;
+    bool settings_start_in_fullscreen = false;
+    bool settings_always_show_gui = false;
     bool settings_dont_resize = false;
     bool settings_calculate_histograms = false;
 	int32_t settings_selected_theme = UI_Theme_Cactus_Green;

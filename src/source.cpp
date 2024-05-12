@@ -451,7 +451,7 @@ bool is_fullscreen(HWND hwnd) {
 	return !(GetWindowLong(hwnd, GWL_STYLE) & WS_CAPTION);
 }
 
-void toggle_fullscreen(HWND hwnd){
+void toggle_fullscreen(HWND hwnd) {
 	if (!is_fullscreen(hwnd))
 		enter_fullscreen(hwnd);
 	else
@@ -498,10 +498,12 @@ static void save_settings() {
     cJSON_AddItemToObject(config_file, "settings_sort", cJSON_CreateBool(G->settings_sort));
     cJSON_AddItemToObject(config_file, "settings_exif", cJSON_CreateBool(G->settings_exif));
     cJSON_AddItemToObject(config_file, "settings_hide_status_fullscreen", cJSON_CreateBool(G->settings_hide_status_fullscreen));
+    cJSON_AddItemToObject(config_file, "settings_start_in_fullscreen", cJSON_CreateBool(G->settings_start_in_fullscreen));
     cJSON_AddItemToObject(config_file, "settings_dont_resize", cJSON_CreateBool(G->settings_dont_resize));
     cJSON_AddItemToObject(config_file, "settings_selected_theme", cJSON_CreateNumber(G->settings_selected_theme));
     cJSON_AddItemToObject(config_file, "settings_calculate_histograms", cJSON_CreateBool(G->settings_calculate_histograms));
     cJSON_AddItemToObject(config_file, "settings_hide_status_with_gui", cJSON_CreateBool(G->settings_hide_status_with_gui));
+    cJSON_AddItemToObject(config_file, "settings_always_show_gui", cJSON_CreateBool(G->settings_always_show_gui));
     cJSON_AddItemToObject(config_file, "settings_newfilezoom", cJSON_CreateNumber(G->settings_newfilezoom));
     cJSON_AddItemToObject(config_file, "settings_copy_color_format", cJSON_CreateNumber(G->settings_copy_color_format));
     cJSON_AddItemToObject(config_file, "settings_copy_color_enclose_type", cJSON_CreateNumber(G->settings_copy_color_enclose_type));
@@ -524,40 +526,49 @@ static void load_settings() {
 		fread(data, 1, size, F);
 		fclose(F);
 		cJSON *config_file = cJSON_ParseWithLength(data, size);
+		cJSON *item = 0;
 		
 		cJSON *j_checkboard_color_1 = cJSON_GetObjectItemCaseSensitive(config_file, "checkerboard_color_1");
-		checkerboard_color_1[0] = cJSON_GetArrayItem(j_checkboard_color_1, 0)->valuedouble;
-		checkerboard_color_1[1] = cJSON_GetArrayItem(j_checkboard_color_1, 1)->valuedouble;
-		checkerboard_color_1[2] = cJSON_GetArrayItem(j_checkboard_color_1, 2)->valuedouble;
+		if (j_checkboard_color_1) {
+			checkerboard_color_1[0] = cJSON_GetArrayItem(j_checkboard_color_1, 0)->valuedouble;
+			checkerboard_color_1[1] = cJSON_GetArrayItem(j_checkboard_color_1, 1)->valuedouble;
+			checkerboard_color_1[2] = cJSON_GetArrayItem(j_checkboard_color_1, 2)->valuedouble;
+		}
 		cJSON *j_checkboard_color_2 = cJSON_GetObjectItemCaseSensitive(config_file, "checkerboard_color_2");
-		checkerboard_color_2[0] = cJSON_GetArrayItem(j_checkboard_color_2, 0)->valuedouble;
-		checkerboard_color_2[1] = cJSON_GetArrayItem(j_checkboard_color_2, 1)->valuedouble;
-		checkerboard_color_2[2] = cJSON_GetArrayItem(j_checkboard_color_2, 2)->valuedouble;
+		if (j_checkboard_color_2) {
+			checkerboard_color_2[0] = cJSON_GetArrayItem(j_checkboard_color_2, 0)->valuedouble;
+			checkerboard_color_2[1] = cJSON_GetArrayItem(j_checkboard_color_2, 1)->valuedouble;
+			checkerboard_color_2[2] = cJSON_GetArrayItem(j_checkboard_color_2, 2)->valuedouble;
+		}
 		cJSON *j_bg_color = cJSON_GetObjectItemCaseSensitive(config_file, "bg_color");
-		bg_color[0] = cJSON_GetArrayItem(j_bg_color, 0)->valuedouble;
-		bg_color[1] = cJSON_GetArrayItem(j_bg_color, 1)->valuedouble;
-		bg_color[2] = cJSON_GetArrayItem(j_bg_color, 2)->valuedouble;
-		bg_color[3] = cJSON_GetArrayItem(j_bg_color, 3)->valuedouble;
-		G->settings_resetpos = cJSON_GetObjectItemCaseSensitive(config_file, "settings_resetpos")->valueint;
-		G->settings_resetzoom = cJSON_GetObjectItemCaseSensitive(config_file, "settings_resetzoom")->valueint;
-		G->settings_autoplayGIFs = cJSON_GetObjectItemCaseSensitive(config_file, "settings_autoplayGIFs")->valueint;
-		G->settings_movementmag = cJSON_GetObjectItemCaseSensitive(config_file, "settings_movementmag")->valuedouble;
-		G->settings_shiftslowmag = cJSON_GetObjectItemCaseSensitive(config_file, "settings_shiftslowmag")->valuedouble;
-		G->settings_movementinvert = cJSON_GetObjectItemCaseSensitive(config_file, "settings_movementinvert")->valueint;
-		G->nearest_filtering = cJSON_GetObjectItemCaseSensitive(config_file, "nearest_filtering")->valueint;
-		G->pixel_grid = cJSON_GetObjectItemCaseSensitive(config_file, "pixel_grid")->valueint;
-		G->settings_sort = cJSON_GetObjectItemCaseSensitive(config_file, "settings_sort")->valueint;
-		G->settings_exif = cJSON_GetObjectItemCaseSensitive(config_file, "settings_exif")->valueint;
-		G->settings_hide_status_fullscreen = cJSON_GetObjectItemCaseSensitive(config_file, "settings_hide_status_fullscreen")->valueint;
-		G->settings_dont_resize = cJSON_GetObjectItemCaseSensitive(config_file, "settings_dont_resize")->valueint;
-		G->settings_selected_theme = cJSON_GetObjectItemCaseSensitive(config_file, "settings_selected_theme")->valueint;
-		G->settings_calculate_histograms = cJSON_GetObjectItemCaseSensitive(config_file, "settings_calculate_histograms")->valueint;
-		G->settings_hide_status_with_gui = cJSON_GetObjectItemCaseSensitive(config_file, "settings_hide_status_with_gui")->valueint;
-		G->settings_newfilezoom = cJSON_GetObjectItemCaseSensitive(config_file, "settings_newfilezoom")->valueint;
-		G->settings_copy_color_format = cJSON_GetObjectItemCaseSensitive(config_file, "settings_copy_color_format")->valueint;
-		G->settings_copy_color_enclose_type = cJSON_GetObjectItemCaseSensitive(config_file, "settings_copy_color_enclose_type")->valueint;
-		G->settings_copy_color_include_alpha = cJSON_GetObjectItemCaseSensitive(config_file, "settings_copy_color_include_alpha")->valueint;
-		G->settings_copy_color_normalize_rgb = cJSON_GetObjectItemCaseSensitive(config_file, "settings_copy_color_normalize_rgb")->valueint;
+		if (j_bg_color) {
+			bg_color[0] = cJSON_GetArrayItem(j_bg_color, 0)->valuedouble;
+			bg_color[1] = cJSON_GetArrayItem(j_bg_color, 1)->valuedouble;
+			bg_color[2] = cJSON_GetArrayItem(j_bg_color, 2)->valuedouble;
+			bg_color[3] = cJSON_GetArrayItem(j_bg_color, 3)->valuedouble;
+		}
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_resetpos"); 					if (item) G->settings_resetpos = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_resetzoom"); 				if (item) G->settings_resetzoom = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_autoplayGIFs"); 				if (item) G->settings_autoplayGIFs = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_movementmag"); 				if (item) G->settings_movementmag = item->valuedouble;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_shiftslowmag"); 				if (item) G->settings_shiftslowmag = item->valuedouble;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_movementinvert"); 			if (item) G->settings_movementinvert = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "nearest_filtering"); 					if (item) G->nearest_filtering = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "pixel_grid"); 						if (item) G->pixel_grid = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_sort"); 						if (item) G->settings_sort = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_exif"); 						if (item) G->settings_exif = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_hide_status_fullscreen"); 	if (item) G->settings_hide_status_fullscreen = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_start_in_fullscreen"); 		if (item) G->settings_start_in_fullscreen = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_dont_resize"); 				if (item) G->settings_dont_resize = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_selected_theme"); 			if (item) G->settings_selected_theme = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_calculate_histograms"); 		if (item) G->settings_calculate_histograms = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_hide_status_with_gui"); 		if (item) G->settings_hide_status_with_gui = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_always_show_gui"); 			if (item) G->settings_always_show_gui = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_newfilezoom"); 				if (item) G->settings_newfilezoom = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_copy_color_format"); 		if (item) G->settings_copy_color_format = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_copy_color_enclose_type"); 	if (item) G->settings_copy_color_enclose_type = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_copy_color_include_alpha"); 	if (item) G->settings_copy_color_include_alpha = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_copy_color_normalize_rgb"); 	if (item) G->settings_copy_color_normalize_rgb = item->valueint;
         fclose(F);
 		free(data);
     }
@@ -2183,6 +2194,8 @@ static void update_gui() {
 	bool draw_status = !fullscreen || (fullscreen && !G->settings_hide_status_fullscreen);
 	if (!G->show_gui && G->settings_hide_status_with_gui)
 		draw_status = false;
+	if (G->settings_always_show_gui)
+		draw_status = true;
 
 	if (draw_status) {
 		UI_Block *status_bar = UI_push_block(ctx, 0);
@@ -2454,7 +2467,7 @@ static void update_gui() {
 	if (G->files.Count == 0)
 		G->gui_disabled = true;
 	static bool popup_open = false;
-	if (G->show_gui || popup_open) {
+	if ((G->show_gui || popup_open) || G->settings_always_show_gui) {
 		popup_open = false;
 		//if (G->files.Count && G->files[G->current_file_index].failed)
 		//G->gui_disabled = true;
@@ -3097,7 +3110,9 @@ static void update_gui() {
 				UI_checkbox(&checkbox_default, &G->settings_exif, "Parse EXIF data from JPEGs");
 				UI_tooltip("Parses image orientation, disablable for optional performance improvement");
 				UI_checkbox(&checkbox_default, &G->settings_hide_status_fullscreen, "Hide status bar in fullscreen mode");
+				UI_checkbox(&checkbox_default, &G->settings_start_in_fullscreen, "Start Cactus Viewer in fullscreen mode");
 				UI_checkbox(&checkbox_default, &G->settings_hide_status_with_gui, "Only show status bar on hover");
+				UI_checkbox(&checkbox_default, &G->settings_always_show_gui, "Always show GUI");
 				UI_checkbox(&checkbox_default, &G->settings_dont_resize, "Don't resize window on image change");
 				UI_checkbox(&checkbox_default, &G->settings_calculate_histograms, "Calculate image histograms (relatively performance intensive on load)");
 			}
@@ -3382,7 +3397,7 @@ static void update_logic() {
             G->position *= G->scale / prev_scale;
             G->position += Mouse;
         }
-        if (G->show_gui) {
+        if ((G->show_gui) || G->settings_always_show_gui) {
 			TS = G->truescale_edit;
         }
         if (G->files.Count > 0) {
