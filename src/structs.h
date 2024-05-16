@@ -385,7 +385,8 @@ struct Signals
 #define TYPE_GIF 1
 #define TYPE_WEBP 2
 #define TYPE_WEBP_ANIM 3
-#define TYPE_MISC 4
+#define TYPE_PPM 4
+#define TYPE_MISC 5
 
 struct File_Data
 {
