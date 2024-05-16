@@ -1323,7 +1323,7 @@ static void load_image_post() {
     G->graphics.main_image.aspect_ratio = (float)frac.n1 / frac.n2;
 
     wchar_t title[512];
-    swprintf(title, L"CactusViewer %hs - %ws", VERSION, G->files[G->current_file_index].file.name);
+    swprintf(title, array_size(title), L"CactusViewer %hs - %ws", VERSION, G->files[G->current_file_index].file.name);
     SetWindowTextW(hwnd, title);
 
     apply_settings();
@@ -1665,7 +1665,7 @@ static int scan_folder(wchar_t *path) {
         BasePath[len] = '\\';
         BasePath[len + 1] = 0;
         FileName = (wchar_t*)malloc(8 * sizeof(wchar_t));
-        swprintf(FileName, L"none");
+        swprintf(FileName, 8, L"none");
 		result = SCAN_DIR;
 	} else {
 		remove_char(path, '/"');
@@ -1689,18 +1689,21 @@ static int scan_folder(wchar_t *path) {
             // FileName will be empty and BasePath will be the image name... swap and set BasePath to current working directory.
             free(FileName);
             FileName = BasePath;
-            BasePath = (wchar_t *)malloc((wcslen(CURRENT_FOLDER) + 2) * sizeof(wchar_t));
-            swprintf(BasePath, L"%ls%lc%lc%", CURRENT_FOLDER, L'\\', L'\0');
+            const size_t name_len = wcslen(CURRENT_FOLDER) + 2;
+            BasePath = (wchar_t *)malloc(name_len * sizeof(wchar_t));
+            swprintf(BasePath, name_len, L"%ls%lc", CURRENT_FOLDER, L'\\');
         } else if (PathFileExistsW(BasePath) && PathIsRelativeW(BasePath)) {
             // If BasePath is relative, append it to current working directory.
             wchar_t *Tmp = BasePath;
-            BasePath = (wchar_t *)malloc((wcslen(Tmp) + wcslen(CURRENT_FOLDER) + 2) * sizeof(wchar_t));
-            swprintf(BasePath, L"%ls\\%ls%lc%lc%", CURRENT_FOLDER, Tmp, L'\\', L'\0');
+            const size_t name_len = wcslen(Tmp) + wcslen(CURRENT_FOLDER) + 2;
+            BasePath = (wchar_t *)malloc(name_len * sizeof(wchar_t));
+            swprintf(BasePath, name_len, L"%ls\\%ls%lc", CURRENT_FOLDER, Tmp, L'\\');
             free(Tmp);
         }
 		
-        FullPath = (wchar_t *)malloc((wcslen(BasePath) + wcslen(FileName) + 1) * sizeof(wchar_t));
-        swprintf(FullPath, L"%ls%ls%lc", BasePath, FileName, L'\0');
+		const size_t name_len = wcslen(BasePath) + wcslen(FileName) + 1;
+        FullPath = (wchar_t *)malloc(name_len * sizeof(wchar_t));
+        swprintf(FullPath, name_len, L"%ls%ls%lc", BasePath, FileName, L'\0');
 	}
     if (!is_valid_windows_path(BasePath))  {
         G->files.reset_count();
