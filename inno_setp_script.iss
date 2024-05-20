@@ -83,6 +83,7 @@ Root: HKA; Subkey: "Software\Classes\Applications\CactusViewer\SupportedTypes"; 
 Root: HKA; Subkey: "Software\Classes\Applications\CactusViewer\SupportedTypes"; ValueType: string; ValueName: ".ori"; ValueData: "" ; Tasks: setDefault
 Root: HKA; Subkey: "Software\Classes\Applications\CactusViewer\SupportedTypes"; ValueType: string; ValueName: ".pef"; ValueData: "" ; Tasks: setDefault
 Root: HKA; Subkey: "Software\Classes\Applications\CactusViewer\SupportedTypes"; ValueType: string; ValueName: ".png"; ValueData: "" ; Tasks: setDefault
+Root: HKA; Subkey: "Software\Classes\Applications\CactusViewer\SupportedTypes"; ValueType: string; ValueName: ".ppm"; ValueData: "" ; Tasks: setDefault
 Root: HKA; Subkey: "Software\Classes\Applications\CactusViewer\SupportedTypes"; ValueType: string; ValueName: ".ptx"; ValueData: "" ; Tasks: setDefault
 Root: HKA; Subkey: "Software\Classes\Applications\CactusViewer\SupportedTypes"; ValueType: string; ValueName: ".pxn"; ValueData: "" ; Tasks: setDefault
 Root: HKA; Subkey: "Software\Classes\Applications\CactusViewer\SupportedTypes"; ValueType: string; ValueName: ".raf"; ValueData: "" ; Tasks: setDefault

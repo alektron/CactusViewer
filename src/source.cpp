@@ -1103,6 +1103,83 @@ static int load_webp_pre(wchar_t *path, u32 id, bool dropped, int* type) {
     return result;
 }
 
+static int load_ppm_pre(wchar_t *path, u32 id, bool dropped, int* type) {
+	int result = 0;
+	unsigned int width = 0;
+	unsigned int height = 0;
+	unsigned int depth = 0;
+	unsigned char* data = NULL;
+	char header[4] = { 0 };
+	uint8_t block[63]; // @hkva: greatest multiple of 3 in a cache line
+	size_t block_read = 0;
+	size_t cur_write = 0;
+	FILE* f = NULL;
+	G->files[id].loading = true;
+	if (!(f = _wfopen(path, L"rb"))) {
+		goto cleanup;
+	}
+	if (!fgets(header, sizeof(header), f) || strncmp(header, "P6\n", 3)) {
+		goto cleanup;
+	}
+	// Skip header comments
+	while (fgetc(f) == '#') {
+		fscanf(f, "%*[^\n]");
+	}
+	fseek(f, -1, SEEK_CUR);
+	if (fscanf(f, "%u %u\n", &width, &height) < 2) {
+		goto cleanup;
+	}
+	if (fscanf(f, "%u", &depth) < 1 || depth != 255) {
+		goto cleanup;
+	}
+	fseek(f, 1, SEEK_CUR);
+	data = (unsigned char*)walloc(width * height * 4);
+	for (size_t i = 0; i < width * height * 4; ++i) {
+		data[i] = 0xFF;
+	}
+	// RRGGBB -> RRGGBBAA
+	while ((block_read = fread(block, 1, sizeof(block), f)) > 0) {
+		if (block_read % 3 != 0 || cur_write + (block_read / 3 * 4) > width * height * 4) {
+			goto cleanup;
+		}
+		for (size_t i = 0; i < block_read / 3; ++i) {
+			data[cur_write++] = block[i*3+0];
+			data[cur_write++] = block[i*3+1];
+			data[cur_write++] = block[i*3+2];
+			data[cur_write++] = 0xFF;
+		}
+	}
+	G->files[id].loading = false;
+	if (width > G->graphics.MAX_GPU || height > G->graphics.MAX_GPU) {
+		push_alert("Image is too large.");
+		goto cleanup;
+	}
+	EnterCriticalSection(&G->mutex);
+	if (id == G->current_file_index) {
+		G->graphics.main_image.w = width;
+		G->graphics.main_image.h = height;
+		G->graphics.main_image.n = 4;
+		// @hkva: freeing here causes corrupted image data to be displayed
+		// same with load_webp_pre()
+#if 0
+		if (G->graphics.main_image.data) {
+			wfree(G->graphics.main_image.data);
+			G->graphics.main_image.data = 0;
+		}
+#endif
+		G->graphics.main_image.data = data;
+		send_signal(G->signals.init_step_2);
+	} else {
+		wfree(data);
+	}
+	LeaveCriticalSection(&G->mutex);
+	result = 1;
+cleanup:
+	// if (data) free(data);
+	if (f) fclose(f);
+	return result;
+}
+
 void save_PPM() {
     const int dimx = 800, dimy = 800;
     int i, j;
@@ -1117,8 +1194,6 @@ void save_PPM() {
     }
     (void)fclose(fp);
 }
-
-
 
 static int load_GIF_pre(wchar_t *File, u32 id, bool dropped) {
     int w, h;
@@ -1341,6 +1416,7 @@ DWORD WINAPI loader_thread(LPVOID lpParam) {
 			case TYPE_STB_IMAGE:  	load_image_pre(inputs->file_data->file.path, inputs->id, inputs->dropped); 							break;
 			case TYPE_GIF: 			load_GIF_pre(inputs->file_data->file.path, inputs->id, inputs->dropped); 							break;
 			case TYPE_WEBP: 		load_webp_pre(inputs->file_data->file.path, inputs->id, inputs->dropped, &inputs->file_data->type); break;
+			case TYPE_PPM: 			load_ppm_pre(inputs->file_data->file.path, inputs->id, inputs->dropped, &inputs->file_data->type); break;
 			case TYPE_MISC: 		load_image_wic_pre(inputs->file_data->file.path, inputs->id, inputs->dropped, inputs->file_data); 	break;
 		}
     }
@@ -1363,6 +1439,8 @@ static int check_valid_extention(wchar_t *EXT) {
 //    else if (wcscmp(ext, L".bmp")  == 0)	result = TYPE_STB_IMAGE;
 	if (wcscmp(ext, L".gif")  == 0)	result = TYPE_GIF;
     else if (wcscmp(ext, L".webp") == 0)	result = TYPE_WEBP;
+    // Portable PixMap
+    else if (wcscmp(ext, L".ppm") == 0)		result = TYPE_PPM;
 	// WIC formats:
 	else if (wcscmp(ext, L".3fr")   == 0)   result = TYPE_MISC;
 	else if (wcscmp(ext, L".ari") 	== 0)   result = TYPE_MISC;
