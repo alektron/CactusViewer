@@ -3018,7 +3018,8 @@ static void update_gui() {
 				{
 					static f32 begin = 0;
 					f32 begin_should = WW / 2.f - thumb_dim / 2.f - G->current_file_index * thumb_dim + 25.f;
-					begin = UI_lerp_f32(begin, begin_should, 0.2);
+					if (WW)
+						begin = UI_lerp_f32(begin, begin_should, 0.2);
 					UI_Block *thumbs_scroll = UI_push_block(ctx);
 					thumbs_scroll->style.position[axis_x] = { UI_Position_t::absolute, f32(begin) };
 					thumbs_scroll->style.layout.axis = axis_x;

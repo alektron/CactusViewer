@@ -148,7 +148,7 @@ inline f32 UI_round_away_from_zero(f32 value) {
 
 static f32 UI_lerp_f32(f32 a, f32 b, f32 t)
 {
-	if (UI_abs(a - b) > 1) G->force_loop = true;
+	if (UI_abs(a - b) > 3) G->force_loop = true;
 	return (a + (b - a) * t);
 }
 
