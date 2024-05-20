@@ -8,6 +8,7 @@ cbuffer Constants : register(b0) {
 
 #define    UI_Vertex_Flags_srgb      (1<<1)
 #define    UI_Vertex_Flags_lcd       (1<<2)
+#define    UI_Vertex_Flags_thumb     (1<<3)
 
 struct VS_Input {
     float2  dst_p0;
@@ -25,6 +26,7 @@ struct VS_Input {
     int     ui_block;
     float   rotation;
     int     flags;
+    int     misc;
 };
 
 //note: Semantics are required on all variables passed between shader stages, even arbitrary ones.
@@ -43,6 +45,7 @@ struct PS_Input {
     int     texture_id          : DATA6;
     int     ui_block            : DATA7;
 	int		flags				: DATA8;
+	int		thumb_draw			: DATA9;
 };
 
 float rounded_rect_SDF(float2 sample_pos, float2 rect_center, float2 rect_half_size, float r) {
@@ -116,6 +119,17 @@ PS_Input VSMain(uint rect_id : SV_INSTANCEID, uint vertex_id : SV_VertexID) {
                            1);
     output.uv = float2(src_pos.x / current_texture_size.x,
                        src_pos.y / current_texture_size.y);
+	output.thumb_draw = false;
+	if (input.flags & UI_Vertex_Flags_thumb && input.misc >= 0) {
+		int n = input.misc;
+		int dim = 50;
+		int texture_size = 4000;
+		int max_thumbnails_per_row = texture_size / dim;
+		int start_x = (n % max_thumbnails_per_row) * dim;
+		int start_y = (n / max_thumbnails_per_row) * dim;
+		output.thumb_draw = true;
+		output.uv = (float2(start_x, start_y) + 0.5 * float2(dim, dim) + vertices[vertex_id] * 0.5 * float2(dim, dim)) / float2(texture_size, texture_size);
+	}
     output.color = input.colors[vertex_id];
 	output.flags = input.flags;
 
@@ -203,8 +217,20 @@ PS_Output PSMain(PS_Input input) {
         float inside_f = smoothstep(0, 2 * input.edge_softness, inside_d);
         border_factor = inside_f;
     }
-	
+
 	float4 color = input.color;
+
+	if (input.flags & UI_Vertex_Flags_thumb) {
+		if (input.thumb_draw)
+			sampled = textures[3].Sample(texture_sampler, input.uv);
+		else
+			sampled = float4(0, 0, 0, 0);
+		PS_Output output;
+		output.color = sampled.bgra * border_factor * sdf_factor + color * 0.3;
+		output.blend = output.color.aaaa;
+		return output;
+	}
+	
 	if (input.flags & UI_Vertex_Flags_srgb) {
 		color = to_linear_4(input.color); 
 	}

@@ -146,6 +146,12 @@ inline f32 UI_round_away_from_zero(f32 value) {
 	return copysign(ceilf(abs(value)), value);
 }
 
+static f32 UI_lerp_f32(f32 a, f32 b, f32 t)
+{
+	if (UI_abs(a - b) > 1) G->force_loop = true;
+	return (a + (b - a) * t);
+}
+
 u32 UI_lerp_u32(u32 col_a, u32 col_b, f32 t, bool refresh_test = false) {
 	u8 r1 = (col_a >> 24) & 0xFF, r2 = (col_b >> 24) & 0xFF; 
 	u8 g1 = (col_a >> 16) & 0xFF, g2 = (col_b >> 16) & 0xFF; 
@@ -593,12 +599,12 @@ UI_Context * UI_init_context() {
     UI_assert(ctx != nullptr);
     // TODO(Wassim): We REALLY need an arena allocator, all this binary tree is run by pointers
     // this is just a placeholder hack that should be changed later!
-	ctx->buffers[0].init_null();        ctx->buffers[0].reserve(500);
-	ctx->buffers[1].init_null();        ctx->buffers[1].reserve(500);
+	ctx->buffers[0].init_null();        ctx->buffers[0].reserve(5000);
+	ctx->buffers[1].init_null();        ctx->buffers[1].reserve(5000);
     ctx->parents.init_null();       	ctx->parents.reserve(1000);
     ctx->fonts.init_null();         	ctx->fonts.reserve(10);
 	ctx->data_chunks.init_null();		ctx->data_chunks.reserve(1000);
-	ctx->blocks_hit_test.init_null();	ctx->blocks_hit_test.reserve(1000);
+	ctx->blocks_hit_test.init_null();	ctx->blocks_hit_test.reserve(10000);
     ctx->hashes.init_null();           
     ctx->vertices.init_null();
     for (int i = 0; i < UI_MAX_TEXTURES; i++)
@@ -607,9 +613,9 @@ UI_Context * UI_init_context() {
     FT_Init_FreeType(&ctx->ft_lib);
     FT_Library_SetLcdFilter(ctx->ft_lib, FT_LCD_FILTER_LIGHT);
 
-	ctx->strings.buffer = (char*)malloc(1024 * 10);
+	ctx->strings.buffer = (char*)malloc(1024 * 100);
 	ctx->strings.count = 0;
-	ctx->strings.capacity = 1024 * 10;
+	ctx->strings.capacity = 1024 * 100;
 	ctx->buffer_index = 0;
     ctx->frame_id = 0;
     ctx->backend = UI_Render_Backend_Type::None;
@@ -923,18 +929,26 @@ void UI_callback_set_cursors(UI_Block* block, Axis2 axis) {
     if (block->style.layout.align[axis] == align_start) {
         block->cursor.e[axis] = block->style.layout.padding.e[axis];
         return;
-    } else if (block->style.layout.align[axis] == align_end) {
-        block->cursor.e[axis] = 
-            block->size.e[axis] - block->style.layout.padding.e[axis];
-        return;
-    }
-
-    f32 total_child_size = 0;
+    } 
+	f32 total_child_size = 0;
+	f32 max_child_size = 0;
     for (UI_Block* child = block->first; child != nullptr; child = child->next) {
         if (child->style.position[axis].type != UI_Position_t::automatic) continue;
         if (axis == block->style.layout.axis) 
             total_child_size += child->size.e[axis];
+		else
+			max_child_size = max(max_child_size, child->size.e[axis]);
     }
+
+	if (block->style.layout.align[axis] == align_end) {
+        if (axis == block->style.layout.axis) 
+        	block->cursor.e[axis] = block->size.e[axis] - block->style.layout.padding.e[axis] - total_child_size;
+		else
+        	block->cursor.e[axis] = block->size.e[axis] - block->style.layout.padding.e[axis] - max_child_size;
+        return;
+    }
+
+
     if (block->style.layout.align[axis] == align_center) {
         if (axis == block->style.layout.axis) 
             block->cursor.e[axis] = (block->size.e[axis] - total_child_size) * 0.5;
@@ -1009,21 +1023,21 @@ void UI_callback_finalize_auto_positions(UI_Block* block, Axis2 axis) {
     if (block->style.position[axis].type != UI_Position_t::automatic) return;
     // position is parents position plus the current cursor position
     if (parent->style.layout.align[axis] == align_end) {
-        block->position.e[axis] = 
-            parent->position.e[axis] + parent->cursor.e[axis] - block->size.e[axis];
+		if (parent->style.layout.axis == axis)
+        	block->position.e[axis] = parent->position.e[axis] + parent->cursor.e[axis];
+		else
+			block->position.e[axis] = parent->position.e[axis] + parent->size.e[axis] - block->size.e[axis];
     } else if (parent->style.layout.align[axis] == align_center) {
         if (axis == parent->style.layout.axis) 
             block->position.e[axis] = parent->position.e[axis] + parent->cursor.e[axis];
         else
-            block->position.e[axis] = 
-                parent->position.e[axis] + parent->cursor.e[axis] - block->size.e[axis] * 0.5;
+            block->position.e[axis] = parent->position.e[axis] + parent->cursor.e[axis] - block->size.e[axis] * 0.5;
     } else {
         block->position.e[axis] = parent->position.e[axis] + parent->cursor.e[axis];
     }
     // increment the cursor by the size of the block
     if (parent->style.layout.axis == axis)
-        parent->cursor.e[axis] += 
-            block->size.e[axis] + parent->style.layout.spacing.e[axis];
+        parent->cursor.e[axis] += block->size.e[axis] + parent->style.layout.spacing.e[axis];
 }
 
 void UI_callback_finalize_custom_positions(UI_Block* block, Axis2 axis) {
@@ -1131,6 +1145,9 @@ void UI_render(UI_Context *ctx) {
         vertex.dst_p0 = block->position;
         vertex.dst_p1 = vertex.dst_p0 + v2(block->size.e[axis_x], 
                                            block->size.e[axis_y]);
+		if (vertex.dst_p0.x > WW || vertex.dst_p0.y > WH ||
+			vertex.dst_p1.x < 0 || vertex.dst_p1.y < 0)
+			continue;
         vertex.texture_id = -1;
         if (block->flags & UI_Block_Flags_draw_image) {
             vertex.texture_id = block->style.texture_handle;
@@ -1148,9 +1165,12 @@ void UI_render(UI_Context *ctx) {
 			vertex.colors[3] = UI_u32_to_v4(block->style.color[c_background].c[3]);
 		}
 		vertex.flags = 0;
-		if (block->flags & UI_Block_Flags_render_srgb)
-			vertex.flags |= UI_Vertex_Flags_srgb;
-        
+
+		if (block->flags & UI_Block_Flags_render_srgb) 	vertex.flags |= UI_Vertex_Flags_srgb;
+		if (block->flags & UI_Block_Flags_thumb)		vertex.flags |= UI_Vertex_Flags_thumb;
+
+		vertex.misc = block->style.misc;
+
         vertex.depth = 1 - (f32)block->depth_level / ctx->parents.capacity;
         vertex.clp_p0 = v2(-1,-1);
         vertex.clp_p1 = v2(-1,-1);

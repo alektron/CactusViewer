@@ -17,6 +17,8 @@
 #define UI_MAX_VERTICES 10000
 #define UI_MAX_TEXTURES 5
 
+#define THUMBS_DIM 50
+
 #define M_PI 3.14159265358979323846
 
 #define UI_assert(argument) assert(argument);
@@ -106,6 +108,7 @@ struct UI_Rect {
 
 #define    UI_Vertex_Flags_srgb      (1<<1)
 #define    UI_Vertex_Flags_lcd       (1<<2)
+#define    UI_Vertex_Flags_thumb     (1<<3)
 
 struct UI_Vertex {
     v2      dst_p0;
@@ -123,6 +126,7 @@ struct UI_Vertex {
     u32     ui_block;
     f32     rotation;
 	i32		flags;
+    i32     misc;
 };
 
 #define    UI_Block_Flags_none              0
@@ -133,6 +137,7 @@ struct UI_Vertex {
 #define    UI_Block_Flags_render_srgb       (1<<5)
 #define    UI_Block_Flags_no_clip       	(1<<6)
 #define    UI_Block_Flags_hit_test       	(1<<7)
+#define    UI_Block_Flags_thumb		       	(1<<8)
 
 
 enum UI_Edge {
@@ -230,6 +235,7 @@ struct UI_Style {
     v2                  texture_uv;
     v2                  texture_src_size;
     f32                 texture_rotation;
+	i32					misc; // miscellaneos value
     i32                 texture_handle = -1; // defaults to -1 so that the shader doesn't sample, TODO(Wassim): 
                                              // not clean, make the shader sample a blank white box instead?
 };

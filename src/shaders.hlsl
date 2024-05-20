@@ -36,6 +36,7 @@ cbuffer Main_Constants : register(b0) {
 };
 
 Texture2D<float4> 	image_texture 	: register(t0);
+Texture2D<float4> 	thumbs_texture 	: register(t1);
 SamplerState 		texture_sampler	: register(s0);
 
 #define PI 3.14159265359
@@ -275,6 +276,7 @@ struct VS_Output {
 	float2 uv 	: TEXCOORD0;    
 };
 
+Texture2D<float4> 	image_texture 	: register(t0);
 VS_Output vs_bg(uint id : SV_VertexID) {
 	uint x = id % 2;
 	uint y = id / 2;

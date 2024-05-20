@@ -95,6 +95,7 @@ int wmain(int argc, wchar_t **argv) {
                 }
             }
 			if (G->signals.reload_file) {
+				G->current_file_index = G->req_file_index;
 				G->signals.reload_file = false;
 				inputs = {G->files[G->current_file_index].file.path, G->current_file_index, &G->files[G->current_file_index], false};
 				CreateThread(NULL, 0, loader_thread, (LPVOID)&inputs, 0, NULL);

@@ -23,7 +23,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
     Keys *K = &G->keys;
 
     switch (message) {
-    case WM_DESTROY:    PostQuitMessage(0); Running = false; break;
+    case WM_CLOSE:
+    case WM_QUIT:
+    case WM_DESTROY:    
+    {
+        PostQuitMessage(0); Running = false; break;
+    }
  	case WM_SIZE:
     {
         RECT rect;

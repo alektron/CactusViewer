@@ -225,7 +225,7 @@ static void init_d3d11(HWND window_handle, int ww, int wh) {
 	ID3D11DeviceContext* base_device_ctx;
 	UINT createDeviceFlags = 0;
 #if DEBUG_MODE
-	//createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+	createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
 	D3D11CreateDevice(
@@ -350,6 +350,14 @@ static void init_d3d11(HWND window_handle, int ww, int wh) {
 	set_framebuffer_size(ctx, iv2(ww, wh));
 
 	G->graphics.MAX_GPU = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+
+	ID3D10Multithread* multi_thread = nullptr;
+    HRESULT hr = ctx->device->QueryInterface(__uuidof(ID3D10Multithread), reinterpret_cast<void**>(&multi_thread));
+    if (SUCCEEDED(hr) && multi_thread)
+    {
+        multi_thread->SetMultithreadProtected(TRUE);
+        multi_thread->Release();
+    }
 }
 
 static Shader_Constants_Main set_main_shader_constants() {
@@ -411,7 +419,7 @@ static Texture create_texture(u8 *data, int w, int h, bool dynamic) {
 	err(d3d_ctx->device->CreateShaderResourceView(result.d3d_texture, &srv_desc, &result.srv));
 	
 
-	if (!dynamic) {
+	if (!dynamic && data) {
 		d3d_ctx->device_ctx->UpdateSubresource(result.d3d_texture, 0, NULL, data, w * 4, w * h * 4);
 		d3d_ctx->device_ctx->GenerateMips(result.srv);
 	}
@@ -502,6 +510,7 @@ static void save_settings() {
     cJSON_AddItemToObject(config_file, "settings_dont_resize", cJSON_CreateBool(G->settings_dont_resize));
     cJSON_AddItemToObject(config_file, "settings_selected_theme", cJSON_CreateNumber(G->settings_selected_theme));
     cJSON_AddItemToObject(config_file, "settings_calculate_histograms", cJSON_CreateBool(G->settings_calculate_histograms));
+    cJSON_AddItemToObject(config_file, "settings_preview_thumbs", cJSON_CreateBool(G->settings_preview_thumbs));
     cJSON_AddItemToObject(config_file, "settings_hide_status_with_gui", cJSON_CreateBool(G->settings_hide_status_with_gui));
     cJSON_AddItemToObject(config_file, "settings_always_show_gui", cJSON_CreateBool(G->settings_always_show_gui));
     cJSON_AddItemToObject(config_file, "settings_newfilezoom", cJSON_CreateNumber(G->settings_newfilezoom));
@@ -562,6 +571,7 @@ static void load_settings() {
 		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_dont_resize"); 				if (item) G->settings_dont_resize = item->valueint;
 		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_selected_theme"); 			if (item) G->settings_selected_theme = item->valueint;
 		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_calculate_histograms"); 		if (item) G->settings_calculate_histograms = item->valueint;
+		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_preview_thumbs"); 			if (item) G->settings_preview_thumbs = item->valueint;
 		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_hide_status_with_gui"); 		if (item) G->settings_hide_status_with_gui = item->valueint;
 		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_always_show_gui"); 			if (item) G->settings_always_show_gui = item->valueint;
 		item = cJSON_GetObjectItemCaseSensitive(config_file, "settings_newfilezoom"); 				if (item) G->settings_newfilezoom = item->valueint;
@@ -701,6 +711,8 @@ static void init_all() {
 	G->graphics.main_image.has_exif = false;
 	G->graphics.main_image.orientation = 0;
 
+	G->graphics.thumbs = create_texture(0, 4000, 4000, false);
+
 	load_settings();
 
 //	BOOL USE_DARK_MODE = G->settings_selected_theme != UI_Theme_Light;
@@ -724,6 +736,7 @@ static void init_all() {
 	
     InitializeCriticalSection(&G->mutex);
     InitializeCriticalSection(&G->sort_mutex);
+    InitializeCriticalSection(&G->thumbs_mutex);
     InitializeCriticalSection(&G->id_mutex);
 
 	G->ui = UI_init_context();
@@ -889,23 +902,11 @@ static int load_image_wic_pre(wchar_t *path, u32 id, bool dropped, File_Data* fi
 	                     IID_IWICImagingFactory,
 	                     (LPVOID*) & G->wic_factory));
 
-	HRESULT hr = G->wic_factory->CreateDecoderFromFilename(path,   
-	                                                       NULL,
-	                                                       GENERIC_READ,
-	                                                       WICDecodeMetadataCacheOnDemand,
-	                                                       &decoder);
-	if(SUCCEEDED(hr))
-		hr = decoder->GetFrame(0, &frame);
-	if(SUCCEEDED(hr))
-		hr =G->wic_factory->CreateFormatConverter(&converter);
-	if(SUCCEEDED(hr))
-		hr = converter->Initialize(frame, 
-		                           GUID_WICPixelFormat32bppRGBA, 
-		                           WICBitmapDitherTypeNone, 
-		                           NULL, 
-		                           0.0, 
-		                           WICBitmapPaletteTypeCustom);
 	unsigned char *data = 0;
+	HRESULT hr = G->wic_factory->CreateDecoderFromFilename(path, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder);
+	if(SUCCEEDED(hr)) hr = decoder->GetFrame(0, &frame);
+	if(SUCCEEDED(hr)) hr =G->wic_factory->CreateFormatConverter(&converter);
+	if(SUCCEEDED(hr)) hr = converter->Initialize(frame, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, NULL, 0.0, WICBitmapPaletteTypeCustom);
 	if (SUCCEEDED(hr)) {
 		converter->GetSize(&w, &h);
 		data = (unsigned char *)walloc(w * h * 4);
@@ -1641,6 +1642,128 @@ DWORD WINAPI folder_sort_thread(LPVOID lpParam) {
     return 0;
 }
 
+DWORD WINAPI thumbs_thread(LPVOID lpParam) {
+
+	IWICImagingFactory* pFactory = nullptr;
+	IWICBitmapScaler* pScaler = nullptr;
+	IWICBitmapClipper* pClipper = nullptr;
+	IWICFormatConverter* pConverter = nullptr;
+	CoInitialize(NULL);
+	CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFactory));
+	pFactory->CreateBitmapScaler(&pScaler);
+	pFactory->CreateBitmapClipper(&pClipper);
+	pFactory->CreateFormatConverter(&pConverter);
+
+	i32 index_pro = clamp(G->current_file_index, 0, G->files.Count - 1);
+	i32 index_retro = clamp(G->current_file_index - 1, 0, G->files.Count - 1);
+
+	//for (int i = 0; i < G->files.Count; i++)
+	bool turn_pro = 0;
+	while(true)
+	{
+
+		i32 i = turn_pro ? index_pro : index_retro;
+		if (turn_pro && index_pro > G->files.Count - 1) {
+			i = index_retro;
+			turn_pro = false;
+		} else if (!turn_pro && index_retro < 0) {
+			i = index_pro;
+			turn_pro = true;
+		}
+
+		cf_file_t *file = &G->files[i].file;
+
+		EnterCriticalSection(&G->thumbs_mutex);
+		i32 thumb_dim = THUMBS_DIM;
+
+		IWICBitmapDecoder* pDecoder = nullptr;
+		IWICBitmapSource* pThumbnail = nullptr;
+		IWICBitmapSource* pSource = nullptr;
+		IWICBitmapFrameDecode* pFrame = nullptr;
+		IWICFormatConverter* pConverter = nullptr;
+		IWICBitmapClipper* pClipper = nullptr;
+		IWICBitmapScaler* pScaler = nullptr;
+
+		HRESULT hr = pFactory->CreateDecoderFromFilename(file->path, nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pDecoder);
+		if (SUCCEEDED(hr)) hr = pDecoder->GetThumbnail(&pThumbnail);
+
+		if (FAILED(hr)) hr = pDecoder->GetFrame(0, &pFrame);
+		if (SUCCEEDED(hr)) pSource = pThumbnail ? pThumbnail : pFrame;
+
+		if (SUCCEEDED(hr)) hr = pFactory->CreateFormatConverter(&pConverter);
+		if (SUCCEEDED(hr)) hr = pConverter->Initialize(pFrame, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, NULL, 0.0, WICBitmapPaletteTypeCustom);
+		if (SUCCEEDED(hr)) pSource = pConverter;
+
+		UINT o_w, o_h;
+		if (SUCCEEDED(hr)) hr = pSource->GetSize(&o_w, &o_h);
+
+		UINT sq_l = min(o_w, o_h);
+		UINT offsetX = (o_w - sq_l) / 2;
+		UINT offsetY = (o_h - sq_l) / 2;
+		WICRect rcClip = { (int)(offsetX), (int)(offsetY), (int)(sq_l), (int)(sq_l) };
+
+		if (SUCCEEDED(hr)) hr = pFactory->CreateBitmapClipper(&pClipper);
+		if (SUCCEEDED(hr)) hr = pClipper->Initialize(pSource, &rcClip);
+		if (SUCCEEDED(hr)) hr = pFactory->CreateBitmapScaler(&pScaler);
+		if (SUCCEEDED(hr)) hr = pScaler->Initialize(pClipper, thumb_dim, thumb_dim, WICBitmapInterpolationModeFant);
+
+		UINT stride = thumb_dim * 4;
+		UINT bufferSize = stride * thumb_dim;
+		BYTE* buffer = nullptr;
+		if (SUCCEEDED(hr)) {
+			buffer = (BYTE*)(malloc(bufferSize));
+			memset(buffer, 0, bufferSize);
+			hr = pScaler->CopyPixels(nullptr, stride, bufferSize, buffer);
+		}
+
+		if (SUCCEEDED(hr)) {
+			int n = i;
+			const UINT texture_size = 4000;
+			const UINT max_thumbnails_per_row = texture_size / thumb_dim;
+
+			UINT start_x = (n % max_thumbnails_per_row) * thumb_dim;
+			UINT start_y = (n / max_thumbnails_per_row) * thumb_dim;
+			UINT end_x = start_x + thumb_dim;
+			UINT end_y = start_y + thumb_dim;
+
+			D3D11_BOX dst_box = { start_x, start_y, 0, end_x, end_y, 1 };
+			G->graphics.device_ctx->UpdateSubresource(G->graphics.thumbs.d3d_texture, 0, &dst_box, buffer, stride, bufferSize);
+		}
+
+		if (pSource && pSource != pThumbnail && pSource != pConverter) pSource->Release();
+		if (buffer) 	free(buffer);
+		if (pThumbnail) pThumbnail->Release();
+		if (pFrame)		pFrame->Release();
+		if (pConverter) pConverter->Release();
+		if (pClipper) 	pClipper->Release();
+		if (pScaler) 	pScaler->Release();
+		if (pDecoder) 	pDecoder->Release();
+
+		if (turn_pro)
+			index_pro++;
+		else
+			index_retro--;
+
+		turn_pro = !turn_pro;
+
+		G->files[i].thumb_loaded = true;
+		LeaveCriticalSection(&G->thumbs_mutex);
+
+		if (index_pro > G->files.Count - 1 && index_retro < 0)
+			break;
+		if(G->signals.new_folder)
+			break;
+	}
+
+	if (pClipper) pClipper->Release();
+	if (pScaler) pScaler->Release();
+	if (pFactory) pFactory->Release();
+	CoUninitialize();
+
+    return 0;
+}
+
+
 Folder_Sort_Thread_data sort_data;
 
 #define SCAN_FAILED 0
@@ -1648,11 +1771,15 @@ Folder_Sort_Thread_data sort_data;
 #define SCAN_DIR 2
 
 static int scan_folder(wchar_t *path) {
+
+
 	int result = SCAN_FILE;
     if (path == nullptr) {
         G->files.reset_count();
 		return SCAN_DIR;
     }
+
+
     int len = wcslen(path);
     wchar_t *BasePath = nullptr;
     wchar_t *FileName = nullptr;
@@ -1712,6 +1839,10 @@ static int scan_folder(wchar_t *path) {
 
     cf_dir_t dir;
     cf_dir_open(&dir, BasePath);
+
+	send_signal(G->signals.new_folder);
+
+	EnterCriticalSection(&G->thumbs_mutex);
 
     G->files.reset_count();
 
@@ -1773,8 +1904,17 @@ static int scan_folder(wchar_t *path) {
     free(BasePath);    
     free(FileName);  
 	
+	LeaveCriticalSection(&G->thumbs_mutex);
+
+	G->signals.new_folder = false;
+
+	if (G->settings_preview_thumbs)
+		CreateThread(NULL, 0, thumbs_thread, 0, 0, NULL);
+	
     return result;
 }
+
+
 
 unsigned long create_RBG(int r, int g, int b) {
     return (r << 16) | (g << 8) | b;
@@ -2192,7 +2332,7 @@ static void update_gui() {
 	u32 font_size_status = 13;
 	u32 font_size_btn = 12;
 
-	u32 base = 0;
+	u32 status_bar_height = 0;
 	bool fullscreen = is_fullscreen(hwnd);
 	bool draw_status = !fullscreen || (fullscreen && !G->settings_hide_status_fullscreen);
 	if (!G->show_gui && G->settings_hide_status_with_gui)
@@ -2211,7 +2351,7 @@ static void update_gui() {
 		status_bar->style.layout.padding = v2(3);
 		status_bar->style.layout.align[axis_y] = align_center;
 		status_bar->style.layout.axis = axis_x;
-		base = 30;
+		status_bar_height = 30;
 
 		UI_push_parent(ctx, status_bar);
 		if (G->alert.timer > 0) {
@@ -2375,7 +2515,7 @@ static void update_gui() {
 		theme->bg_main_4,
 		theme->bg_main_2_d
 	};
-	btn_default.color_text = {
+	btn_default.color_inner = {
 		theme->text_reg_main,
 		theme->text_reg_main,
 		theme->text_slider_2,
@@ -2470,310 +2610,374 @@ static void update_gui() {
 	if (G->files.Count == 0)
 		G->gui_disabled = true;
 	static bool popup_open = false;
+
 	if ((G->show_gui || popup_open) || G->settings_always_show_gui) {
 		popup_open = false;
 		//if (G->files.Count && G->files[G->current_file_index].failed)
 		//G->gui_disabled = true;
 
-		UI_Block *main_h_bar = UI_push_block(ctx, 0);
-		main_h_bar->style.position[axis_x] = { UI_Position_t::absolute, 0 };
-		main_h_bar->style.position[axis_y] = { UI_Position_t::absolute, f32(WH - 205 - base) };
-		main_h_bar->style.size[axis_x] = { UI_Size_t::pixels, f32(WW), 1 };
-		main_h_bar->style.size[axis_y] = { UI_Size_t::pixels, 200, 1 };
-		main_h_bar->style.layout.axis = axis_x;
-		main_h_bar->style.layout.align[axis_x] = align_center;
-		main_h_bar->style.layout.align[axis_y] = align_end;
-		main_h_bar->style.layout.spacing = v2(5);
-		UI_push_parent_defer(ctx, main_h_bar)
+		UI_Block *main_bar = UI_push_block(ctx, 0);
+		main_bar->style.position[axis_x] = { UI_Position_t::absolute, 0 };
+		main_bar->style.position[axis_y] = { UI_Position_t::absolute, 0 };
+		main_bar->style.size[axis_x] = { UI_Size_t::pixels, f32(WW), 1 };
+		main_bar->style.size[axis_y] = { UI_Size_t::pixels, f32(WH - status_bar_height - 2), 1 };
+		main_bar->style.layout.spacing = v2(2);
+		main_bar->style.layout.align[axis_y] = align_end;
+		main_bar->style.layout.axis = axis_y;
+		UI_push_parent_defer(ctx, main_bar)
 		{
-			UI_Block *left_menu = UI_push_block(ctx);
-			left_menu->style.size[axis_x] = { UI_Size_t::sum_of_children, 0, 1 };
-			left_menu->style.size[axis_y] = { UI_Size_t::sum_of_children, 0, 1 };
-			left_menu->style.color[c_background] = theme->bg_main_0;
-			left_menu->style.layout.padding = v2(8);
-			left_menu->style.layout.spacing = v2(5, 3);
-			left_menu->style.layout.axis = axis_x;
-			left_menu->style.roundness = v4(8);
-			left_menu->flags |= UI_Block_Flags_draw_background;
-			left_menu->hash = UI_hash_djb2(ctx, "left_menu");
-			G->check_mouse_hashes.push_back(left_menu->hash);
-			UI_push_parent_defer(ctx, left_menu)
+			UI_Block *main_h_bar = UI_push_block(ctx);
+			main_h_bar->style.size[axis_x] = { UI_Size_t::pixels, f32(WW), 1 };
+			main_h_bar->style.size[axis_y] = { UI_Size_t::pixels, 100, 1 };
+			main_h_bar->style.layout.axis = axis_x;
+			main_h_bar->style.layout.align[axis_x] = align_center;
+			main_h_bar->style.layout.align[axis_y] = align_end;
+			main_h_bar->style.layout.spacing = v2(5);
+			UI_push_parent_defer(ctx, main_h_bar)
 			{
-				UI_push_parent_defer(ctx, UI_bar(axis_y))
+				UI_Block *left_menu = UI_push_block(ctx);
+				left_menu->style.size[axis_x] = { UI_Size_t::sum_of_children, 0, 1 };
+				left_menu->style.size[axis_y] = { UI_Size_t::sum_of_children, 0, 1 };
+				left_menu->style.color[c_background] = theme->bg_main_0;
+				left_menu->style.layout.padding = v2(8);
+				left_menu->style.layout.spacing = v2(5, 3);
+				left_menu->style.layout.axis = axis_x;
+				left_menu->style.roundness = v4(8);
+				left_menu->flags |= UI_Block_Flags_draw_background;
+				left_menu->hash = UI_hash_djb2(ctx, "left_menu");
+				G->check_mouse_hashes.push_back(left_menu->hash);
+				UI_push_parent_defer(ctx, left_menu)
 				{
-					v2 btn_size = v2(75, 27);
-					UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
-					UI_Image_Edit_Style image_value_style;
-					image_value_style.checkbox_style = checkbox_default;
-					image_value_style.button_style = btn_default;
-					image_value_style.button_style.size = btn_size;
-					image_value_style.slider_style = slider_style;
-					image_value_style.slider_style.pad_style = false;
-					image_value_style.slider_style.logarithmic = false;
-					image_value_style.color_text = theme->text_reg_main;
-					image_value_style.color_frame_bg = theme->bg_sub;
-					popup_open |= UI_image_edit(&image_value_style, "edit");
-
-					UI_Histogram_Style histogram_style;
-					histogram_style.button_style = btn_default;
-					histogram_style.button_style.size = btn_size;
-					histogram_style.color_text = theme->text_reg_main;
-					histogram_style.checkbox_style = checkbox_default;
-					histogram_style.color_frame_bg = theme->bg_sub;
-
-					UI_set_disabled_defer((!G->settings_calculate_histograms || !G->graphics.main_image.has_histo))
+					UI_push_parent_defer(ctx, UI_bar(axis_y))
 					{
-						popup_open |= UI_histogram(&histogram_style, "histogram");
-					}
-
-					UI_Button_Style style = btn_default;
-					style.color_bg.base = theme->pos_btn_0;
-					style.color_bg.hot = theme->pos_btn_1;
-					style.color_bg.active = theme->pos_btn_2;
-					style.size = btn_size;
-					if (UI_button(&style, "save as")) {
-						if (SUCCEEDED(save_as_dialogue() )) {
-							push_alert("Image saved successfully!", Alert_Info);
-						}
-					}
-				}
-				UI_push_parent_defer(ctx, UI_bar(axis_y))
-				{
-					UI_get_current_parent(ctx)->style.layout.spacing = v2(3);
-					UI_checkbox(&checkbox_default, (bool *) & RGBAflags[0], "R"); UI_tooltip("Toggle red channel");
-					UI_checkbox(&checkbox_default, (bool *) & RGBAflags[1], "G"); UI_tooltip("Toggle green channel");
-					UI_checkbox(&checkbox_default, (bool *) & RGBAflags[2], "B"); UI_tooltip("Toggle blue channel");
-					UI_checkbox(&checkbox_default, (bool *) & RGBAflags[3], "A"); UI_tooltip("Toggle alpha channel");
-				}
-				UI_push_parent_defer(ctx, UI_bar(axis_y))
-				{
-					UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
-					btn_default.size = v2(50, 19);
-					if (UI_button(&btn_default, "fit in")) {
-						G->position = v2(0, 0);
-						fit_image_in();
-						send_signal(G->signals.update_truescale);
-					}
-					UI_tooltip("Fit image within window size");
-					if (UI_button(&btn_default, "fit W")) {
-						fit_image_w();
-						send_signal(G->signals.update_truescale);
-					}
-					UI_tooltip("Zoom image to fit its width to the window width");
-					if (UI_button(&btn_default, "fit H")) {
-						fit_image_h();
-						send_signal(G->signals.update_truescale);
-					}
-					UI_tooltip("Zoom image to fit its height to the window height");
-					if (UI_button(&btn_default, "1:1")) {
-						fit_image_1();
-						send_signal(G->signals.update_truescale);
-					}
-				}
-			}
-
-			UI_Block *control_menu = UI_push_block(ctx);
-			control_menu->style.size[axis_x] = { UI_Size_t::sum_of_children, 0, 1 };
-			control_menu->style.size[axis_y] = { UI_Size_t::sum_of_children, 0, 1 };
-			control_menu->style.color[c_background] = theme->bg_main_0;
-			control_menu->style.layout.padding = v2(8);
-			control_menu->style.layout.spacing = v2(5);
-			control_menu->style.layout.axis = axis_y;
-			control_menu->style.roundness = v4(8);
-			control_menu->flags |= UI_Block_Flags_draw_background;
-			control_menu->hash = UI_hash_djb2(ctx, "control_menu");
-			G->check_mouse_hashes.push_back(control_menu->hash);
-			UI_push_parent_defer(ctx, control_menu)
-			{
-				if (G->files.Count && (G->files[G->current_file_index].type == TYPE_GIF || G->files[G->current_file_index].type == TYPE_WEBP_ANIM)) {
-					UI_Button_Style style_main = btn_default;
-					UI_Button_Style style_side = btn_default;
-					style_side.size = v2(35, 30);
-					style_main.size = v2(75, 30);
-					char *str_play = "Play";
-					char *str_pause = "Pause";
-					char *str_button = G->anim_play ? str_pause : str_play;
-					f32 req_index_f = G->anim_index;
-					sprintf(slider_style.string, "frame: %i \\ %i", G->anim_index, G->anim_frames - 1);
-					UI_slider(&slider_style, axis_x,  &req_index_f, 0, G->anim_frames - 1, UI_hash_djb2(ctx, "gif_slider"));
-					G->anim_index = req_index_f;
-					int req_index_i = G->anim_index;
-					UI_push_parent_defer(ctx, UI_bar(axis_x))
-					{
+						v2 btn_size = v2(75, 27);
 						UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
-						UI_set_disabled_defer((G->anim_play || G->anim_index == 0)) {
-							if (UI_button(&style_side, "<<")) req_index_i--;
-						}
-						if (UI_button(&style_main, str_button)) G->anim_play = !G->anim_play;
-						UI_set_disabled_defer((G->anim_play || G->anim_index == 0)) {
-							if (UI_button(&style_side, ">>")) req_index_i++;
-						}
-						G->anim_index = clamp(req_index_i, 0, G->anim_frames - 1);
-					}
-				}
-				static float testnr = 0.1;
-				slider_style.bar_short_axis = slider_style.pad_min_size = 25;
-				slider_style.logarithmic = true;
-				sprintf(slider_style.string, "zoom: %.0f%%%%", G->truescale * 100);
+						UI_Image_Edit_Style image_value_style;
+						image_value_style.checkbox_style = checkbox_default;
+						image_value_style.button_style = btn_default;
+						image_value_style.button_style.size = btn_size;
+						image_value_style.slider_style = slider_style;
+						image_value_style.slider_style.pad_style = false;
+						image_value_style.slider_style.logarithmic = false;
+						image_value_style.color_text = theme->text_reg_main;
+						image_value_style.color_frame_bg = theme->bg_sub;
+						popup_open |= UI_image_edit(&image_value_style, "edit");
 
-				if (UI_slider(&slider_style, axis_x, &G->truescale_edit, 0.1, 500, UI_hash_djb2(ctx, "zoom slider"))) {
-					send_signal(G->signals.update_scale_ui);
-				}
-	
-				slider_style.logarithmic = false;
-				UI_push_parent_defer(ctx, UI_bar(axis_x))
-				{
-					UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
-					UI_Button_Style style = btn_default;
-					style.size = v2(75, 42);
-					UI_set_disabled_defer((G->files.Count == 0) || G->sorting || !(G->current_file_index > 0)) {
-						if (UI_button(&style, "<< Prev")) {
-							send_signal(G->signals.prev_image);
-						}
-					}
-					UI_set_disabled_defer((G->files.Count == 0) || G->sorting || !(G->current_file_index < G->files.Count - 1)) {
-						if (UI_button(&style, "Next >>")) {
-							send_signal(G->signals.next_image);
-						}
-					}
+						UI_Histogram_Style histogram_style;
+						histogram_style.button_style = btn_default;
+						histogram_style.button_style.size = btn_size;
+						histogram_style.color_text = theme->text_reg_main;
+						histogram_style.checkbox_style = checkbox_default;
+						histogram_style.color_frame_bg = theme->bg_sub;
 
-				}
-				float file = G->current_file_index;
-				slider_style.string[0] = 0;
-				slider_style.col_text = {
-					theme->text_reg_main_d,
-					theme->text_reg_main_d,
-					theme->text_reg_main_d,
-					theme->text_reg_main_d
-				};
-				slider_style.bar_long_axis -= 30;
-				sprintf(slider_style.string, "file: %i \\ %i", G->current_file_index + 1, G->files.Count);
-				slider_style.bar_short_axis = slider_style.pad_min_size = 15;
-				UI_push_parent_defer(ctx, UI_bar(axis_x))
-				{
-					UI_set_disabled_defer(true)
-					{
-						UI_slider(&slider_style, axis_x, &file, 0, G->files.Count - 1, UI_hash_djb2(ctx, "file slider"));
-					}
-					UI_Button_Style bs = btn_default;
-					bs.size = v2(30, 15);
-					bs.dots = true;
-					UI_Button_Style bsi = btn_default;
-					bsi.size = v2(125, 25);
-					UI_set_disabled_defer(G->files.Count == 0)
-					{
-						popup_open |= UI_files_reload_menu(&bs, &bsi, "files order");
-					}
-				}
-			}
-
-			UI_Block *right_menu = UI_push_block(ctx);
-			right_menu->style.size[axis_x] = { UI_Size_t::sum_of_children, 0, 1 };
-			right_menu->style.size[axis_y] = { UI_Size_t::sum_of_children, 0, 1 };
-			right_menu->style.color[c_background] = theme->bg_main_0;
-			right_menu->style.layout.padding = v2(8);
-			right_menu->style.layout.spacing = v2(5, 3);
-			right_menu->style.layout.axis = axis_y;
-			right_menu->style.roundness = v4(8);
-			right_menu->flags |= UI_Block_Flags_draw_background;
-			right_menu->hash = UI_hash_djb2(ctx, "right_menu");
-			G->check_mouse_hashes.push_back(right_menu->hash);
-			UI_push_parent_defer(ctx, right_menu)
-			{
-				UI_push_parent_defer(ctx, UI_bar(axis_x))
-				{
-					UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
-					UI_Button_Style style = btn_default;
-					style.size = v2(62.5, 20);
-					style.font_size -= 2;
-					if (UI_button(&style, "Rotate L")) { 
-						G->graphics.main_image.orientation++;
-						iv2 prev_a = G->crop_a;
-						iv2 prev_b = G->crop_b;
-						G->crop_a = iv2(prev_a.y, G->graphics.main_image.w -  prev_b.x);
-						G->crop_b = iv2(prev_b.y, G->graphics.main_image.w -  prev_a.x);
-						swap(int, G->graphics.main_image.w, G->graphics.main_image.h);
-					}
-					UI_tooltip("rotate image 90 degrees anticlockwise (doesn't change original file)");
-					if (UI_button(&style, "Rotate R")) {
-						G->graphics.main_image.orientation--;
-						iv2 prev_a = G->crop_a;
-						iv2 prev_b = G->crop_b;
-						G->crop_a = iv2(G->graphics.main_image.h - prev_b.y, prev_a.x);
-						G->crop_b = iv2(G->graphics.main_image.h - prev_a.y, prev_b.x);
-						swap(int, G->graphics.main_image.w, G->graphics.main_image.h);
-					}
-					UI_tooltip("rotate image 90 degrees clockwise (doesn't change original file)");
-					G->graphics.main_image.orientation = clamp_circular(G->graphics.main_image.orientation, 0, 3);
-				}
-				UI_push_parent_defer(ctx, UI_bar(axis_y))
-				{
-					UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
-					UI_push_parent_defer(ctx, UI_bar(axis_x))
-					{
-						UI_get_current_parent(ctx)->style.layout.spacing = v2(19);
-						UI_push_parent_defer(ctx, UI_bar(axis_y))
+						UI_set_disabled_defer((!G->settings_calculate_histograms || !G->graphics.main_image.has_histo))
 						{
-							UI_checkbox(&checkbox_default, &G->nearest_filtering, "nrst");
-							UI_tooltip("Toggle between nearest-neighbor and linear filtering");
-							if (!G->nearest_filtering) UI_set_disabled(true);
-							UI_checkbox(&checkbox_default, &G->pixel_grid, "grid");
-							UI_tooltip("Show pixel grid");
-							UI_reset_disabled();
+							popup_open |= UI_histogram(&histogram_style, "histogram");
 						}
 
-						UI_set_disabled_defer(false) {
-							static u32 tmp_bg_color = UI_v4_to_u32(v4(bg_color));
-							UI_push_parent_defer(ctx, UI_bar(axis_y))
-							{
-								UI_Block* bar = UI_get_current_parent(ctx);
-								bar->style.layout.spacing = v2(3);
-								picker_style.button_size = v2(65, 40);
-								popup_open |= UI_color_picker(&picker_style, &tmp_bg_color, true, 15);
-								UI_tooltip("Set background color");
-								v4 new_bg_color = UI_u32_to_v4(tmp_bg_color);
-								bg_color[0] = new_bg_color[0];
-								bg_color[1] = new_bg_color[1];
-								bg_color[2] = new_bg_color[2];
-								bg_color[3] = new_bg_color[3];
-							}
-						}
-					}
-					UI_push_parent_defer(ctx, UI_bar(axis_x))
-					{
-						UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
 						UI_Button_Style style = btn_default;
 						style.color_bg.base = theme->pos_btn_0;
 						style.color_bg.hot = theme->pos_btn_1;
 						style.color_bg.active = theme->pos_btn_2;
-						v2 btn_size = v2(50, 25);
-						UI_set_disabled_defer(false) {
-							style.size = btn_size;
-							if (UI_button(&style, "open")) {
-								file_open_dialogue();
+						style.size = btn_size;
+						if (UI_button(&style, "save as")) {
+							if (SUCCEEDED(save_as_dialogue())) {
+								push_alert("Image saved successfully!", Alert_Info);
 							}
-							UI_tooltip("Open image file");
-							style = btn_default;
-							style.size = btn_size;
-							if (UI_button(&style, "config")) {
-								G->settings_visible = true;
-								G->exif_data_visible = false;
-							}
-							UI_tooltip("Open settings menu");
 						}
-						style.size = v2(20, 25);
-						UI_set_disabled_defer(!G->graphics.main_image.has_exif) {
-							if (UI_button(&style, "i")) {
-								G->exif_data_visible = true;
-								G->settings_visible = false;
+					}
+					UI_push_parent_defer(ctx, UI_bar(axis_y))
+					{
+						UI_get_current_parent(ctx)->style.layout.spacing = v2(3);
+						UI_checkbox(&checkbox_default, (bool *) & RGBAflags[0], "R"); UI_tooltip("Toggle red channel");
+						UI_checkbox(&checkbox_default, (bool *) & RGBAflags[1], "G"); UI_tooltip("Toggle green channel");
+						UI_checkbox(&checkbox_default, (bool *) & RGBAflags[2], "B"); UI_tooltip("Toggle blue channel");
+						UI_checkbox(&checkbox_default, (bool *) & RGBAflags[3], "A"); UI_tooltip("Toggle alpha channel");
+					}
+					UI_push_parent_defer(ctx, UI_bar(axis_y))
+					{
+						UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
+						btn_default.size = v2(50, 19);
+						if (UI_button(&btn_default, "fit in")) {
+							G->position = v2(0, 0);
+							fit_image_in();
+							send_signal(G->signals.update_truescale);
+						}
+						UI_tooltip("Fit image within window size");
+						if (UI_button(&btn_default, "fit W")) {
+							fit_image_w();
+							send_signal(G->signals.update_truescale);
+						}
+						UI_tooltip("Zoom image to fit its width to the window width");
+						if (UI_button(&btn_default, "fit H")) {
+							fit_image_h();
+							send_signal(G->signals.update_truescale);
+						}
+						UI_tooltip("Zoom image to fit its height to the window height");
+						if (UI_button(&btn_default, "1:1")) {
+							fit_image_1();
+							send_signal(G->signals.update_truescale);
+						}
+					}
+				}
+
+				UI_Block *control_menu = UI_push_block(ctx);
+				control_menu->style.size[axis_x] = { UI_Size_t::sum_of_children, 0, 1 };
+				control_menu->style.size[axis_y] = { UI_Size_t::sum_of_children, 0, 1 };
+				control_menu->style.color[c_background] = theme->bg_main_0;
+				control_menu->style.layout.padding = v2(8);
+				control_menu->style.layout.spacing = v2(5);
+				control_menu->style.layout.axis = axis_y;
+				control_menu->style.roundness = v4(8);
+				control_menu->flags |= UI_Block_Flags_draw_background;
+				control_menu->hash = UI_hash_djb2(ctx, "control_menu");
+				G->check_mouse_hashes.push_back(control_menu->hash);
+				UI_push_parent_defer(ctx, control_menu)
+				{
+					if (G->files.Count && (G->files[G->current_file_index].type == TYPE_GIF || G->files[G->current_file_index].type == TYPE_WEBP_ANIM)) {
+						UI_Button_Style style_main = btn_default;
+						UI_Button_Style style_side = btn_default;
+						style_side.size = v2(35, 30);
+						style_main.size = v2(75, 30);
+						char *str_play = "Play";
+						char *str_pause = "Pause";
+						char *str_button = G->anim_play ? str_pause : str_play;
+						f32 req_index_f = G->anim_index;
+						sprintf(slider_style.string, "frame: %i \\ %i", G->anim_index, G->anim_frames - 1);
+						UI_slider(&slider_style, axis_x,  &req_index_f, 0, G->anim_frames - 1, UI_hash_djb2(ctx, "gif_slider"));
+						G->anim_index = req_index_f;
+						int req_index_i = G->anim_index;
+						UI_push_parent_defer(ctx, UI_bar(axis_x))
+						{
+							UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
+							UI_set_disabled_defer((G->anim_play || G->anim_index == 0)) {
+								if (UI_button(&style_side, "<<")) req_index_i--;
 							}
-							if (!G->graphics.main_image.has_exif)
-								UI_tooltip("No EXIF metadata found on this image!");
-							else
-								UI_tooltip("Open image EXIF metadata");
+							if (UI_button(&style_main, str_button)) G->anim_play = !G->anim_play;
+							UI_set_disabled_defer((G->anim_play || G->anim_index == 0)) {
+								if (UI_button(&style_side, ">>")) req_index_i++;
+							}
+							G->anim_index = clamp(req_index_i, 0, G->anim_frames - 1);
+						}
+					}
+					static float testnr = 0.1;
+					slider_style.bar_short_axis = slider_style.pad_min_size = 25;
+					slider_style.logarithmic = true;
+					sprintf(slider_style.string, "zoom: %.0f%%%%", G->truescale * 100);
+
+					if (UI_slider(&slider_style, axis_x, &G->truescale_edit, 0.1, 500, UI_hash_djb2(ctx, "zoom slider"))) {
+						send_signal(G->signals.update_scale_ui);
+					}
+	
+					slider_style.logarithmic = false;
+					UI_push_parent_defer(ctx, UI_bar(axis_x))
+					{
+						UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
+						UI_Button_Style style = btn_default;
+						style.size = v2(75, 42);
+						UI_set_disabled_defer((G->files.Count == 0) || G->sorting || !(G->current_file_index > 0)) {
+							if (UI_button(&style, "<< Prev")) {
+								send_signal(G->signals.prev_image);
+							}
+						}
+						UI_set_disabled_defer((G->files.Count == 0) || G->sorting || !(G->current_file_index < G->files.Count - 1)) {
+							if (UI_button(&style, "Next >>")) {
+								send_signal(G->signals.next_image);
+							}
 						}
 
 					}
+					float file = G->current_file_index;
+					slider_style.string[0] = 0;
+					slider_style.col_text = {
+						theme->text_reg_main_d,
+						theme->text_reg_main_d,
+						theme->text_reg_main_d,
+						theme->text_reg_main_d
+					};
+					slider_style.bar_long_axis -= 30;
+					sprintf(slider_style.string, "file: %i \\ %i", G->current_file_index + 1, G->files.Count);
+					slider_style.bar_short_axis = slider_style.pad_min_size = 15;
+					UI_push_parent_defer(ctx, UI_bar(axis_x))
+					{
+						UI_set_disabled_defer(true)
+						{
+							UI_slider(&slider_style, axis_x, &file, 0, G->files.Count - 1, UI_hash_djb2(ctx, "file slider"));
+						}
+						UI_Button_Style bs = btn_default;
+						bs.size = v2(30, 15);
+						bs.dots = true;
+						UI_Button_Style bsi = btn_default;
+						bsi.size = v2(125, 25);
+						UI_set_disabled_defer(G->files.Count == 0)
+						{
+							popup_open |= UI_files_reload_menu(&bs, &bsi, "files order");
+						}
+					}
+				}
+
+				UI_Block *right_menu = UI_push_block(ctx);
+				right_menu->style.size[axis_x] = { UI_Size_t::sum_of_children, 0, 1 };
+				right_menu->style.size[axis_y] = { UI_Size_t::sum_of_children, 0, 1 };
+				right_menu->style.color[c_background] = theme->bg_main_0;
+				right_menu->style.layout.padding = v2(8);
+				right_menu->style.layout.spacing = v2(5, 3);
+				right_menu->style.layout.axis = axis_y;
+				right_menu->style.roundness = v4(8);
+				right_menu->flags |= UI_Block_Flags_draw_background;
+				right_menu->hash = UI_hash_djb2(ctx, "right_menu");
+				G->check_mouse_hashes.push_back(right_menu->hash);
+				UI_push_parent_defer(ctx, right_menu)
+				{
+					UI_push_parent_defer(ctx, UI_bar(axis_x))
+					{
+						UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
+						UI_Button_Style style = btn_default;
+						style.size = v2(62.5, 20);
+						style.font_size -= 2;
+						if (UI_button(&style, "Rotate L")) {
+							G->graphics.main_image.orientation++;
+							iv2 prev_a = G->crop_a;
+							iv2 prev_b = G->crop_b;
+							G->crop_a = iv2(prev_a.y, G->graphics.main_image.w - prev_b.x);
+							G->crop_b = iv2(prev_b.y, G->graphics.main_image.w - prev_a.x);
+							swap(int, G->graphics.main_image.w, G->graphics.main_image.h);
+						}
+						UI_tooltip("rotate image 90 degrees anticlockwise (doesn't change original file)");
+						if (UI_button(&style, "Rotate R")) {
+							G->graphics.main_image.orientation--;
+							iv2 prev_a = G->crop_a;
+							iv2 prev_b = G->crop_b;
+							G->crop_a = iv2(G->graphics.main_image.h - prev_b.y, prev_a.x);
+							G->crop_b = iv2(G->graphics.main_image.h - prev_a.y, prev_b.x);
+							swap(int, G->graphics.main_image.w, G->graphics.main_image.h);
+						}
+						UI_tooltip("rotate image 90 degrees clockwise (doesn't change original file)");
+						G->graphics.main_image.orientation = clamp_circular(G->graphics.main_image.orientation, 0, 3);
+					}
+					UI_push_parent_defer(ctx, UI_bar(axis_y))
+					{
+						UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
+						UI_push_parent_defer(ctx, UI_bar(axis_x))
+						{
+							UI_get_current_parent(ctx)->style.layout.spacing = v2(19);
+							UI_push_parent_defer(ctx, UI_bar(axis_y))
+							{
+								UI_checkbox(&checkbox_default, &G->nearest_filtering, "nrst");
+								UI_tooltip("Toggle between nearest-neighbor and linear filtering");
+								if (!G->nearest_filtering) UI_set_disabled(true);
+								UI_checkbox(&checkbox_default, &G->pixel_grid, "grid");
+								UI_tooltip("Show pixel grid");
+								UI_reset_disabled();
+							}
+
+							UI_set_disabled_defer(false) {
+								static u32 tmp_bg_color = UI_v4_to_u32(v4(bg_color));
+								UI_push_parent_defer(ctx, UI_bar(axis_y))
+								{
+									UI_Block* bar = UI_get_current_parent(ctx);
+									bar->style.layout.spacing = v2(3);
+									picker_style.button_size = v2(65, 40);
+									popup_open |= UI_color_picker(&picker_style, &tmp_bg_color, true, 15);
+									UI_tooltip("Set background color");
+									v4 new_bg_color = UI_u32_to_v4(tmp_bg_color);
+									bg_color[0] = new_bg_color[0];
+									bg_color[1] = new_bg_color[1];
+									bg_color[2] = new_bg_color[2];
+									bg_color[3] = new_bg_color[3];
+								}
+							}
+						}
+						UI_push_parent_defer(ctx, UI_bar(axis_x))
+						{
+							UI_get_current_parent(ctx)->style.layout.spacing = v2(5);
+							UI_Button_Style style = btn_default;
+							style.color_bg.base = theme->pos_btn_0;
+							style.color_bg.hot = theme->pos_btn_1;
+							style.color_bg.active = theme->pos_btn_2;
+							v2 btn_size = v2(50, 25);
+							UI_set_disabled_defer(false) {
+								style.size = btn_size;
+								if (UI_button(&style, "open")) {
+									file_open_dialogue();
+								}
+								UI_tooltip("Open image file");
+								style = btn_default;
+								style.size = btn_size;
+								if (UI_button(&style, "config")) {
+									G->settings_visible = true;
+									G->exif_data_visible = false;
+								}
+								UI_tooltip("Open settings menu");
+							}
+							style.size = v2(20, 25);
+							UI_set_disabled_defer(!G->graphics.main_image.has_exif) {
+								if (UI_button(&style, "i")) {
+									G->exif_data_visible = true;
+									G->settings_visible = false;
+								}
+								if (!G->graphics.main_image.has_exif)
+									UI_tooltip("No EXIF metadata found on this image!");
+								else
+									UI_tooltip("Open image EXIF metadata");
+							}
+
+						}
+					}
+				}
+			}
+			if (G->files.Count && G->settings_preview_thumbs) {
+				i32 thumb_dim = THUMBS_DIM;
+				UI_Block *thumbs_bar = UI_push_block(ctx);
+				thumbs_bar->style.size[axis_x] = { UI_Size_t::pixels, f32(WW), 1 };
+				thumbs_bar->style.size[axis_y] = { UI_Size_t::pixels, 50, 1 };
+				thumbs_bar->style.layout.axis = axis_x;
+				thumbs_bar->style.layout.align[axis_x] = align_center;
+				thumbs_bar->style.softness = 0;
+				thumbs_bar->hash = UI_hash_djb2(ctx, "thumbs_bar");
+				G->check_mouse_hashes.push_back(thumbs_bar->hash);
+				UI_push_parent_defer(ctx, thumbs_bar)
+				{
+					static f32 begin = 0;
+					f32 begin_should = WW / 2.f - thumb_dim / 2.f - G->current_file_index * thumb_dim + 25.f;
+					begin = UI_lerp_f32(begin, begin_should, 0.2);
+					UI_Block *thumbs_scroll = UI_push_block(ctx);
+					thumbs_scroll->style.position[axis_x] = { UI_Position_t::absolute, f32(begin) };
+					thumbs_scroll->style.layout.axis = axis_x;
+					thumbs_bar->style.color[c_background] = theme->bg_sub;
+					thumbs_bar->flags |= UI_Block_Flags_draw_background;
+					UI_push_parent_defer(ctx, thumbs_scroll)
+					{
+						UI_push_hash(ctx, UI_hash_djb2(ctx, "thumbs"));
+						for (int i = 0; i < G->files.Count; i++) {
+							UI_Button_Style thumb_style;
+							thumb_style.color_bg.base = theme->bg_main_2;
+							thumb_style.color_bg.hot = theme->bg_main_3;
+							thumb_style.color_bg.active = theme->bg_main_4;
+							thumb_style.color_inner.base = UI_color4_sld_u32(0);
+							thumb_style.color_inner.hot = theme->pos_btn_1;
+							thumb_style.color_inner.active = theme->pos_btn_2;
+							thumb_style.roundness = v4(0.f);
+							thumb_style.size = v2(thumb_dim);
+							thumb_style.thumb_button = true;
+							thumb_style.thumb_index = i;
+							if (UI_button(&thumb_style, "%i", i)) {
+								send_signal(G->signals.reload_file);
+								G->req_file_index = i;
+							}
+						}
+						UI_pop_hash(ctx);
+					}
+					UI_Block *selector = UI_push_block(ctx);
+					selector->flags |= UI_Block_Flags_draw_border;
+					selector->style.size[axis_x] = { UI_Size_t::pixels, (f32)thumb_dim, 1 };
+					selector->style.size[axis_y] = { UI_Size_t::pixels, (f32)thumb_dim, 1 };
+					selector->style.position[axis_x] = { UI_Position_t::absolute, (WW - thumb_dim) * 0.5f + 25.f };
+					selector->style.position[axis_y] = { UI_Position_t::percent_of_parent, 0 };
+					selector->style.border_size = 2;
+					selector->style.softness = 0;
+					selector->style.color[c_border] = theme->text_reg_light;
+					selector->depth_level += 5;
 				}
 			}
 		}
@@ -3118,6 +3322,9 @@ static void update_gui() {
 				UI_checkbox(&checkbox_default, &G->settings_always_show_gui, "Always show GUI");
 				UI_checkbox(&checkbox_default, &G->settings_dont_resize, "Don't resize window on image change");
 				UI_checkbox(&checkbox_default, &G->settings_calculate_histograms, "Calculate image histograms (relatively performance intensive on load)");
+				UI_checkbox(&checkbox_default, &G->settings_preview_thumbs, "Show thumbnail bar of images in folder.");
+				UI_tooltip("Generates thumbnails for images in the folder (can be performance intensive with large folders and is limited to 25.600 images.)");
+
 			}
 			UI_push_parent_defer(ctx, UI_bar(axis_x)) {
 				UI_push_parent_defer(ctx, UI_bar(axis_x)) {

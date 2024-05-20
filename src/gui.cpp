@@ -212,12 +212,14 @@ struct UI_Color4_Set {
 
 struct UI_Button_Style {
 	UI_Color4_Set color_bg;
-	UI_Color4_Set color_text;
+	UI_Color4_Set color_inner;
 	UI_Font* font;
 	u32 font_size;
 	v4 roundness;
 	bool dots;
 	v2 size; //ignored if zero
+	bool thumb_button = 0;
+	i32 thumb_index;
 };
 
 UI_Color4 UI_animate_color_4(
@@ -253,17 +255,17 @@ bool UI_button(UI_Button_Style *style, char* name, ...) {
 	va_end(args); 
 
 	UI_Block *box = 0;
-	UI_Block *text_block = 0;
+	UI_Block *inner_block = 0;
 
 	box = UI_push_block(ctx);
-	UI_push_parent(ctx, box);
-	text_block = UI_push_block(ctx);
-	UI_pop_parent(ctx);
-
+	UI_push_parent_defer(ctx, box) {
+		inner_block = UI_push_block(ctx);
+	}
 	box->hash = UI_hash_formatted(ctx, "%s#__BTN_BOX__", formatted_name);
 	box->style.size[axis_x] = {UI_Size_t::sum_of_children, 0, 1};
 	box->style.size[axis_y] = {UI_Size_t::pixels, f32(style->font_size * 2), 1};
 	UI_Color4 color_background = box->style.color[c_background] = style->color_bg.base;
+	UI_Color4 color_inner_bg = inner_block->style.color[c_background] = style->color_bg.base;
 	box->style.layout.align[axis_x] = align_center;
 	box->style.layout.align[axis_y] = align_center;
 	if (style->dots)
@@ -274,30 +276,39 @@ bool UI_button(UI_Button_Style *style, char* name, ...) {
 
 	if (style->size.x > 0) box->style.size[axis_x] = {UI_Size_t::pixels, style->size.x, 1};
 	if (style->size.y > 0) box->style.size[axis_y] = {UI_Size_t::pixels, style->size.y, 1};
-
 //	if (strlen(formatted_name) < 2) 
 //		box->style.size[axis_x] = {UI_Size_t::pixels, style->font_size * 2 - box->style.layout.padding.x, 1};
-
-	text_block->string = formatted_name;
-	text_block->flags |= UI_Block_Flags_draw_text;
-	text_block->hash =  UI_hash_formatted(ctx, "%s__TEXT__", formatted_name);
-	text_block->style.font = style->font;
-	UI_Color4 color_text = text_block->style.color[c_text] = style->color_text.base;
-	text_block->style.font_size = style->font_size;
-	text_block->style.size[axis_x] = {UI_Size_t::text_content, 0, 1};
-	text_block->style.size[axis_y] = {UI_Size_t::text_content, 0, 1};
-
+	inner_block->hash = UI_hash_formatted(ctx, "%s__TEXT__", formatted_name);
+	UI_Color4 color_text;
+	if (style->thumb_button) {
+		inner_block->style.misc = -1;
+		if (G->files[style->thumb_index].thumb_loaded)
+			inner_block->style.misc = style->thumb_index;
+		inner_block->flags |= UI_Block_Flags_thumb | UI_Block_Flags_draw_background | UI_Block_Flags_hit_test;
+		inner_block->style.size[axis_x] = box->style.size[axis_x];
+		inner_block->style.size[axis_y] = box->style.size[axis_y];
+		inner_block->style.softness = 0;
+		box->style.softness = 0;
+	} else {
+		inner_block->string = formatted_name;
+		inner_block->flags |= UI_Block_Flags_draw_text;
+		inner_block->style.font = style->font;
+		inner_block->style.font_size = style->font_size;
+		inner_block->style.size[axis_x] = { UI_Size_t::text_content, 0, 1 };
+		inner_block->style.size[axis_y] = { UI_Size_t::text_content, 0, 1 };
+	}
 	bool result = false;
 	bool hot = false;
 	bool active = false;
 	bool disabled = G->gui_disabled;
 	UI_Block* prev = UI_find_block(ctx, box->hash, UI_PREVIOUS);
-	UI_Block* prev_txt = UI_find_block(ctx, text_block->hash, UI_PREVIOUS);
+	UI_Block* prev_inn = UI_find_block(ctx, inner_block->hash, UI_PREVIOUS);
 
-	if (prev && prev_txt) {
+	if (prev && prev_inn) {
 		color_background = prev->style.color[c_background];
-		color_text = prev_txt->style.color[c_text];
-		if (UI_mouse_in_block(prev) && !disabled) {
+		color_inner_bg = prev_inn->style.color[c_background];
+		color_text = prev_inn->style.color[c_text];
+		if (UI_mouse_in_block(prev) || UI_mouse_in_block(prev_inn)  && !disabled) {
 			active = keypress(MouseL);
 			if (keydn(MouseL)) {
 				G->mouse_dn_hash = prev->hash;
@@ -312,7 +323,12 @@ bool UI_button(UI_Button_Style *style, char* name, ...) {
 	}
 
 	box->style.color[c_background] = UI_animate_color_4(color_background, hot, active, disabled, style->color_bg);
-	text_block->style.color[c_text] = UI_animate_color_4(color_text, hot, active, disabled, style->color_text);
+	if (style->thumb_button)
+		inner_block->style.color[c_background] = UI_animate_color_4(color_inner_bg, hot, active, disabled, style->color_inner);
+	else
+	{
+		inner_block->style.color[c_text] = UI_animate_color_4(color_text, hot, active, disabled, style->color_inner);
+	}
 	G->tooltip_block = box;
 
 	return result;

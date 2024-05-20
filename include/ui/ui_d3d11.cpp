@@ -290,6 +290,10 @@ void UI_d3d11_render(UI_Context *ctx) {
     for (int i = 0; i < UI_MAX_TEXTURES; i++) {
         texture_array[i] = d3d_ctx->textures[i].srv;
     }
+
+	// hack in but the API should be adjusted to better support things like this in the future:
+	texture_array[3] = G->graphics.thumbs.srv; 
+
     d3d_ctx->device_ctx->PSSetShaderResources(1, UI_MAX_TEXTURES, texture_array); 
     d3d_ctx->device_ctx->PSSetSamplers(0, 1, &d3d_ctx->sampler_state);
     d3d_ctx->device_ctx->OMSetBlendState(d3d_ctx->blend_state, nullptr, 0xffffffff);

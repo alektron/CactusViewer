@@ -350,6 +350,7 @@ struct Graphics
 
     Image main_image;
 	Texture logo_image;
+	Texture thumbs;
 
     float aspect_wnd;
     float aspect_img;
@@ -378,6 +379,7 @@ struct Signals
     bool update_truescale = false;
     bool setting_applied = false;
 	bool update_scale_ui = false;
+	bool new_folder = false;
 };
 
 #define TYPE_UNKNOWN -1
@@ -397,6 +399,7 @@ struct File_Data
     float scale = 0;
 	bool scaled = false;
     int index;
+	bool thumb_loaded = false;
 };
 
 enum Cursor_Type {
@@ -462,9 +465,11 @@ struct Global
     Keys keys;
     dynarray <File_Data> files;
     u32 current_file_index;
+    u32 req_file_index;
     CRITICAL_SECTION id_mutex;
     CRITICAL_SECTION mutex;
     CRITICAL_SECTION sort_mutex;
+    CRITICAL_SECTION thumbs_mutex;
     CRITICAL_SECTION imgui_mutex;
     Signals signals;
     Alert alert;
@@ -553,6 +558,7 @@ struct Global
     bool settings_always_show_gui = false;
     bool settings_dont_resize = false;
     bool settings_calculate_histograms = false;
+    bool settings_preview_thumbs = true;
 	int32_t settings_selected_theme = UI_Theme_Cactus_Green;
 
 	bool mouse_dragging = false;

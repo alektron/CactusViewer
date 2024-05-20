@@ -182,9 +182,13 @@ Dynarray<String8> w_tokenize(const String8 str)
     return res;
 }
 
+
 void*walloc(size_t size) {
-	return VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	return malloc(size);
+	//return VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 }
+//NOTE (Wassim):  for some reaosn VirtualFree was crashing, need to investigate this later
 void wfree(void* address) {
-	VirtualFree(address, 0, MEM_RELEASE);
+	free(address);
+	//VirtualFree(address, 0, MEM_RELEASE);
 }
