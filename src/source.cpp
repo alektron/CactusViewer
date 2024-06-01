@@ -3024,6 +3024,8 @@ static void update_gui() {
 					int thumbs_that_fit = (WW / thumb_dim) + 2;
 					int start_index = G->current_file_index - (min(G->current_file_index, thumbs_that_fit / 2));
 					f32 offset_begin = begin + start_index * thumb_dim;
+					int end_index = min(start_index + thumbs_that_fit, G->files.Count);
+
 					UI_Block *thumbs_scroll = UI_push_block(ctx);
 					thumbs_scroll->style.position[axis_x] = { UI_Position_t::absolute, f32(offset_begin) };
 					thumbs_scroll->style.layout.axis = axis_x;
@@ -3032,7 +3034,7 @@ static void update_gui() {
 					UI_push_parent_defer(ctx, thumbs_scroll)
 					{
 						UI_push_hash(ctx, UI_hash_djb2(ctx, "thumbs"));
-						for (int i = start_index; i < start_index+thumbs_that_fit; i++) {
+						for (int i = start_index; i < end_index; i++) {
 							UI_Button_Style thumb_style;
 							thumb_style.color_bg.base = theme->bg_main_2;
 							thumb_style.color_bg.hot = theme->bg_main_3;
