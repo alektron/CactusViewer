@@ -103,6 +103,146 @@ struct Dynarray
         }
     }
 };
+
+#define KB(X) ((X)*1024LL)
+#define MB(X) (KB(X)*1024LL)
+#define GB(X) (MB(X)*1024LL)
+
+// NOTE(aidan): This is stable in the sense that pointers into it should always remain valid
+// 				this is achieved by reserving a large block of virtual memory using init_reserve
+template<typename T>
+struct StableDynarray
+{
+    int                 count;
+    int                 capacity;
+    T*                  data;
+    int                 iter;
+	uint64_t			reserved_bytes;
+
+    // Provide standard typedefs but we don't use them ourselves.
+    typedef T                   value_type;
+
+    // Constructors, destructor
+    inline StableDynarray()                                   		    { count = capacity = iter = 0; data = nullptr; }
+    inline StableDynarray(const StableDynarray<T>& src)                 { count = capacity = iter = 0; data = nullptr; operator=(src); }
+
+    // !IMPORTANT! It is now your responsibility to free this thing. It won't free upon destruct. also horray you can pass this around in functions.
+    inline ~StableDynarray()                                      {} 
+    
+    inline void         init_null()                         { count = capacity = iter = reserved_bytes = 0; data = nullptr; }  
+    inline void         reset_count()                       { count = 0;}  
+    inline void         clear()                             { if (data) { count = capacity = reserved_bytes = 0; VirtualFree(data, 0, MEM_RELEASE); data = nullptr;} }  
+    inline void         clear_destruct()                    { for (int n = 0; n < count; n++) data[n].~T(); clear(); }           
+
+    inline bool         is_empty() const                    { return count == 0; }
+    inline int          size_in_bytes() const               { return count * (int)sizeof(T); }
+    inline int          max_size() const                    { return 0x7FFFFFFF / (int)sizeof(T); }
+    inline T&           operator[](int i)                   { assert(i >= 0 && i < count); return data[i]; }
+    inline const T&     operator[](int i) const             { assert(i >= 0 && i < count); return data[i]; }
+
+    inline T*           begin()                             { return data; }
+    inline const T*     begin() const                       { return data; }
+    inline T*           end()                               { return data + count * sizeof(T); }
+    inline const T*     end() const                         { return data + count * sizeof(T); }
+    inline T&           front()                             { assert(count > 0); return data[0]; }
+    inline const T&     front() const                       { assert(count > 0); return data[0]; }
+    inline T&           back()                              { assert(count > 0); return data[count - 1]; }
+    inline const T&     back() const                        { assert(count > 0); return data[count - 1]; }
+
+    inline int _grow_capacity(int sz) const { 
+        int new_capacity = capacity ? (capacity + capacity / 2) : 8; 
+        return new_capacity > sz ? new_capacity : sz; 
+    }
+	inline uint64_t _round_up_to_page(uint64_t bytes) const {
+		const static uint64_t page_size = 4096;
+		uint64_t mask = page_size - 1;
+		if (bytes & mask == 0)
+		{
+			return bytes;
+		}
+		else
+		{
+			return bytes + (page_size - (bytes & mask));
+		}
+	}
+
+    inline void init_reserve(uint64_t new_reserve_bytes, int new_capacity) {
+		if (reserved_bytes)
+		{
+			clear();
+		}
+		count = reserved_bytes = capacity = iter = 0;
+		data = nullptr;
+
+        T* new_data = (T*)VirtualAlloc(0, new_reserve_bytes, MEM_RESERVE, PAGE_NOACCESS);
+		reserved_bytes = new_reserve_bytes;
+        assert(new_data != nullptr);
+
+		uint64_t new_capacity_bytes = new_capacity * sizeof(T);
+		int commit_bytes = _round_up_to_page(new_capacity_bytes);
+
+		VirtualAlloc(new_data, commit_bytes, MEM_COMMIT, PAGE_READWRITE);
+
+        data = new_data; 
+        capacity = new_capacity;
+    }
+	inline void commit(int new_capacity)
+	{
+		uint64_t current_bytes = _round_up_to_page(capacity * sizeof(T));
+		uint64_t new_bytes = _round_up_to_page(new_capacity * sizeof(T));
+
+		if (new_bytes <= current_bytes)
+		{
+			return;
+		}
+
+		assert(new_bytes < reserved_bytes);
+		char* data_bytes = (char*)data;
+		VirtualAlloc(data_bytes + current_bytes, new_bytes - current_bytes, MEM_COMMIT, PAGE_READWRITE);
+		capacity = new_capacity;
+	}
+
+    // NB: It is illegal to call push_back/push_front/insert with a reference pointing inside the w_vector data itself! e.g. v.push_back(v[10]) is forbidden.
+	inline T* push_back(const T& v) { 
+        if (count == capacity) commit(_grow_capacity(count + 1)); 
+        memcpy(&data[count], &v, sizeof(v)); 
+		return &data[count++];
+    }
+    inline void         pop_back()                          { assert(count > 0); count--; }
+    inline void         push_front(const T& v)              { if (count == 0) push_back(v); else insert(data, v); }
+    inline T*           erase(const T* it)                  { assert(it >= data && it < data + count * sizeof(T)); const ptrdiff_t off = it - data; memmove(data + off, data + off + 1, ((size_t)count - (size_t)off - 1) * sizeof(T)); count--; return data + off; }
+    inline T*           erase(const T* it, const T* it_last){ assert(it >= data && it < data + count * sizeof(T) && it_last > it && it_last <= data + count * sizeof(T)); const ptrdiff_t count = it_last - it; const ptrdiff_t off = it - data; memmove(data + off, data + off + count, ((size_t)count - (size_t)off - (size_t)count) * sizeof(T)); count -= (int)count; return data + off; }
+    inline T*           erase_unsorted(const T* it)         { assert(it >= data && it < data + count * sizeof(T));  const ptrdiff_t off = it - data; if (it < data + count * sizeof(T) - 1) memcpy(data + off, data + count * sizeof(T) - 1, sizeof(T)); count--; return data + off; }
+    
+	inline T*           insert(const T* it, const T& v)     { assert(it >= data && it <= data + count * sizeof(T)); const ptrdiff_t off = it - data; if (count == capacity) commit(_grow_capacity(count + 1)); if (off < (int)count) memmove(data + off + 1, data + off, ((size_t)count - (size_t)off) * sizeof(T)); memcpy(&data[off], &v, sizeof(v)); count++; return data + off; }
+    
+	inline bool         contains(const T& v) const          { const T* data = data;  const T* data_end = data + count * sizeof(T); while (data < data_end) if (*data++ == v) return true; return false; }
+    inline T*           find(const T& v)                    { T* data = data;  const T* data_end = data + count * sizeof(T); while (data < data_end) if (*data == v) break; else ++data; return data; }
+    inline const T*     find(const T& v) const              { const T* data = data;  const T* data_end = data + count * sizeof(T); while (data < data_end) if (*data == v) break; else ++data; return data; }
+    inline bool         find_erase(const T& v)              { const T* it = find(v); if (it < data + count * sizeof(T)) { erase(it); return true; } return false; }
+    inline bool         find_erase_unsorted(const T& v)     { const T* it = find(v); if (it < data + count * sizeof(T)) { erase_unsorted(it); return true; } return false; }
+    inline int          index_from_ptr(const T* it) const   { assert(it >= data && it < data + count * sizeof(T)); const ptrdiff_t off = it - data; return (int)off; }
+    inline void         reverse_order()                     { 
+        assert(count > 0);
+        T temp;
+        int i;
+        for (i = 0; i < count / 2; i++) {
+            // Swap arr[i] with arr[n-i-1]
+            temp = data[i];
+            data[i] = data[count-i-1];
+            data[count-i-1] = temp;
+        }
+
+        if (count % 2 == 1) {
+            int mid = count / 2;
+            if (i != mid) {
+                temp = data[mid];
+                data[mid] = data[i];
+                data[i] = temp;
+            }
+        }
+    }
+};
 MSVC_RUNTIME_CHECKS_RESTORE
 
 struct String8

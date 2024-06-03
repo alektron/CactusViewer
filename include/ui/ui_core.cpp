@@ -28,11 +28,11 @@ bool UI_handle_signal(bool *signal) {
 	return result;
 }
 
-Dynarray<UI_Block>* UI_get_current_frame_buffer(UI_Context *ctx) {
+StableDynarray<UI_Block>* UI_get_current_frame_buffer(UI_Context *ctx) {
 	return &ctx->buffers[ctx->buffer_index];
 }
 
-Dynarray<UI_Block>* UI_get_previous_frame_buffer(UI_Context *ctx) {
+StableDynarray<UI_Block>* UI_get_previous_frame_buffer(UI_Context *ctx) {
 	return &ctx->buffers[1 - ctx->buffer_index];
 }
 #define UI_CURRENT 	0
@@ -41,7 +41,7 @@ Dynarray<UI_Block>* UI_get_previous_frame_buffer(UI_Context *ctx) {
 UI_Block *UI_find_block(UI_Context *ctx, u32 hash, int frame) {
 	UI_assert(frame == UI_CURRENT || frame == UI_PREVIOUS);
 	UI_Block *result = 0;
-	Dynarray<UI_Block>* buffer;
+	StableDynarray<UI_Block>* buffer;
 	if 		(frame == UI_PREVIOUS) buffer = UI_get_previous_frame_buffer(ctx);
 	else if (frame == UI_CURRENT)  buffer = UI_get_current_frame_buffer(ctx);
 	if (hash != 0) {
@@ -204,17 +204,21 @@ UI_Color4 UI_animate_color_4(
 }
 
 
-char* UI_sprintf(UI_string_array* string_array, const char *format, ...) {
+char* UI_sprintf(StableDynarray<char>* string_array, const char *format, ...) {
 
 	va_list va;
 	va_start(va, format);
 	int size = vsnprintf(0, 0, format, va);
 	char* result = 0;
 
-	UI_assert(string_array->count + size + 1 <  string_array->capacity)
+	if (string_array->count + size + 1 < string_array->capacity)
+	{
+		string_array->commit(string_array->_grow_capacity(string_array->count + size + 1));
+	}
+
 	if (size >= 0) { 
-		result = &string_array->buffer[string_array->count];
-		vsnprintf(&string_array->buffer[string_array->count], size + 1, format, va);
+		result = &string_array->data[string_array->count];
+		vsnprintf(&string_array->data[string_array->count], size + 1, format, va);
 		string_array->count += size + 1;
 	}
 	va_end(va);
@@ -597,25 +601,27 @@ v2 UI_push_text(
 UI_Context * UI_init_context() {
     UI_Context *ctx = (UI_Context *)malloc(sizeof(UI_Context));
     UI_assert(ctx != nullptr);
+    memset(ctx, 0, sizeof(*ctx));
     // TODO(Wassim): We REALLY need an arena allocator, all this binary tree is run by pointers
     // this is just a placeholder hack that should be changed later!
-	ctx->buffers[0].init_null();        ctx->buffers[0].reserve(5000);
-	ctx->buffers[1].init_null();        ctx->buffers[1].reserve(5000);
-    ctx->parents.init_null();       	ctx->parents.reserve(1000);
-    ctx->fonts.init_null();         	ctx->fonts.reserve(10);
-	ctx->data_chunks.init_null();		ctx->data_chunks.reserve(1000);
-	ctx->blocks_hit_test.init_null();	ctx->blocks_hit_test.reserve(10000);
-    ctx->hashes.init_null();           
+	ctx->buffers[0].init_reserve(GB(4), 5000);
+	ctx->buffers[1].init_reserve(GB(4), 5000);
+    ctx->parents.init_reserve(GB(4), 1000);
+	ctx->data_chunks.init_reserve(GB(4), 1000);
+	ctx->blocks_hit_test.init_reserve(GB(4), 10000);
+    ctx->hashes.init_reserve(GB(4), 5000);
+
     ctx->vertices.init_null();
+    ctx->fonts.init_null();         	ctx->fonts.reserve(100);
+
     for (int i = 0; i < UI_MAX_TEXTURES; i++)
         ctx->textures[i] = 0;
     
     FT_Init_FreeType(&ctx->ft_lib);
     FT_Library_SetLcdFilter(ctx->ft_lib, FT_LCD_FILTER_LIGHT);
 
-	ctx->strings.buffer = (char*)malloc(1024 * 100);
-	ctx->strings.count = 0;
-	ctx->strings.capacity = 1024 * 100;
+	ctx->strings.init_reserve(GB(4), 1024 * 128);
+
 	ctx->buffer_index = 0;
     ctx->frame_id = 0;
     ctx->backend = UI_Render_Backend_Type::None;

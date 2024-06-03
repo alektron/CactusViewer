@@ -300,28 +300,22 @@ struct UI_Block_Data {
 	u32	 hash;
 };
 
-struct UI_string_array {
-	char *buffer;
-	u32 capacity;
-	u32 count;
-};
-
 struct UI_Hit_Test_Item {
 	u32 hash;
 	u32 depth_level;
 };
 struct UI_Context {
-	u32							buffer_index;
-	Dynarray <UI_Block>         buffers[2];
-    Dynarray <UI_Block*>        parents;
-    Dynarray <u32>              hashes;
-	Dynarray <UI_Block_Data>	data_chunks;
-	Dynarray <UI_Hit_Test_Item> blocks_hit_test;
+	u32									buffer_index;
+	StableDynarray <UI_Block>       	buffers[2];
+    StableDynarray <UI_Block*>      	parents;
+    StableDynarray <u32>            	hashes;
+	StableDynarray <UI_Block_Data>		data_chunks;
+	StableDynarray <UI_Hit_Test_Item> 	blocks_hit_test;
 
 	UI_Hit_Test_Item			hit_test_result;
 
     FT_Library                  ft_lib;
-	UI_string_array				strings;
+	StableDynarray<char>		strings;
 
     bool                        textures[UI_MAX_TEXTURES];
     Dynarray <UI_Font>          fonts;  
